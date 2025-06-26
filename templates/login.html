@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center align-items-center" style="min-height: 60vh;">
+  <div class="col-md-6 col-lg-4">
+    <div class="card shadow-lg border-0 rounded-4">
+      <div class="card-body p-4">
+        <div class="text-center mb-4">
+          <img src="static/images/Abvin.jpg" alt="Logo" width="140" height="75" class="mb-3">
+          <h5 class="text-muted fw-normal">SIGN IN</h5>
+        </div>
+        
+        <form method="POST" action="{{ url_for('login') }}">
+          <div class="mb-3">
+            <label for="username" class="form-label">Username / Email</label>
+            <input type="text" class="form-control rounded-3 py-2" id="username" name="username" required>
+          </div>
+          
+          <div class="mb-3">
+            <label for="password" class="form-label">Password</label>
+            <div class="input-group">
+              <input type="password" class="form-control rounded-end-0 py-2" id="password" name="password" required>
+              <button class="btn btn-outline-secondary rounded-start-0 border-start-0 bg-transparent" type="button" id="togglePassword">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
+          </div>
+          
+          <div class="mb-4">
+            <label for="role" class="form-label">Login As</label>
+            <select class="form-select rounded-3 py-2" id="role" name="role" required>
+              <option value="employee">Employee</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          
+          <div class="d-grid">
+            <button type="submit" class="btn btn-primary rounded-3 py-2">Login</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const togglePassword = document.querySelector('#togglePassword');
+    const password = document.querySelector('#password');
+    
+    togglePassword.addEventListener('click', function() {
+      const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
+      password.setAttribute('type', type);
+      
+      const icon = this.querySelector('i');
+      icon.classList.toggle('bi-eye');
+      icon.classList.toggle('bi-eye-slash');
+    });
+  });
+</script>
+
+<style>
+  .card {
+    border-color: rgba(13, 110, 253, 0.2);
+  }
+  
+  #togglePassword {
+    border-color: #ced4da;
+    border-left: none !important;
+  }
+  
+  #togglePassword:hover {
+    background-color: transparent !important;
+  }
+  
+  #togglePassword i {
+    color: #6c757d;
+  }
+  
+  .input-group .form-control:not(:first-child) {
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+  }
+  
+  .form-control:focus, .form-select:focus {
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.1);
+    border-color: #86b7fe;
+  }
+</style>
+{% endblock %}
+
+{% block footer %}
+<footer class="text-center text-white mt-5 py-3" style="background-color: #0d6efd;">
+  <div class="container">
+    <p class="mb-0">
+      &copy; {{ current_year }} Abvin Technologies. All Rights Reserved.
+    </p>
+  </div>
+</footer>
+{% endblock %}

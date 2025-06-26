@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>Manage Permission Applications</h2>
+    
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5>Filters</h5>
+        </div>
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('manage_permissions') }}">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="month">Month</label>
+                            <input type="month" class="form-control" id="month" name="month" value="{{ month_year }}">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="status">Status</label>
+                            <select class="form-control" id="status" name="status">
+                                <option value="pending" {% if status == 'pending' %}selected{% endif %}>Pending</option>
+                                <option value="approved" {% if status == 'approved' %}selected{% endif %}>Approved</option>
+                                <option value="rejected" {% if status == 'rejected' %}selected{% endif %}>Rejected</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label>&nbsp;</label>
+                            <button type="submit" class="btn btn-primary btn-block">Filter</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h5>Permission Applications</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Time</th>
+                            <th>Hours</th>
+                            <th>Reason</th>
+                            <th>Status</th>
+                            <th>Applied On</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for perm in permissions %}
+                        <tr>
+                            <td>{{ perm.first_name }} {{ perm.last_name }} ({{ perm.employee_id }})</td>
+                            <td>{{ perm.date.strftime('%Y-%m-%d') }}</td>
+                            <td>{{ perm.permission_name }}</td>
+                            <td>{{ perm.start_time }} - {{ perm.end_time }}</td>
+                            <td>{{ perm.total_hours }}</td>
+                            <td>{{ perm.reason[:50] }}{% if perm.reason|length > 50 %}...{% endif %}</td>
+                            <td>
+                                {% if perm.status == 'pending' %}
+                                    <span class="badge badge-warning">Pending</span>
+                                {% elif perm.status == 'approved' %}
+                                    <span class="badge badge-success">Approved</span>
+                                {% else %}
+                                    <span class="badge badge-danger">Rejected</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ perm.applied_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>
+{% if perm.status == 'pending' %}
+<form method="POST" action="{{ url_for('permission_action', permission_id=perm.permission_id) }}" class="d-inline">
+    <input type="hidden" name="comments" id="comments_{{ perm.permission_id }}" value="">
+    <div class="btn-group">
+        <button type="submit" class="btn btn-sm btn-success" name="action" value="approved">Approve</button>
+        <button type="submit" class="btn btn-sm btn-danger" name="action" value="rejected">Reject</button>
+    </div>
+    <textarea class="form-control mt-2" placeholder="Comments (optional)" 
+              onchange="document.getElementById('comments_{{ perm.permission_id }}').value = this.value"></textarea>
+</form>
+{% endif %}                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="9" class="text-center">No permission applications found</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

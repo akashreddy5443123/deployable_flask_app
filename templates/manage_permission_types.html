@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>Manage Permission Types</h2>
+    
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5>Add New Permission Type</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('add_permission_type') }}">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="name">Name</label>
+                            <input type="text" class="form-control" id="name" name="name" required>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="max_hours">Max Hours</label>
+                            <input type="number" step="0.5" class="form-control" id="max_hours" name="max_hours" value="3.0" min="0.5" max="24">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="description">Description</label>
+                            <input type="text" class="form-control" id="description" name="description">
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Add Permission Type</button>
+            </form>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h5>Existing Permission Types</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Max Hours</th>
+                            <th>Description</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pt in permission_types %}
+                        <tr>
+                            <td>{{ pt.name }}</td>
+                            <td>{{ pt.max_hours }}</td>
+                            <td>{{ pt.description }}</td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-primary" data-toggle="modal" data-target="#editModal{{ pt.permission_type_id }}">
+                                    Edit
+                                </button>
+                                <form method="POST" action="{{ url_for('delete_permission_type', permission_type_id=pt.permission_type_id) }}" style="display:inline;">
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this permission type?')">Delete</button>
+                                </form>
+                                
+                                <!-- Edit Modal -->
+                                <div class="modal fade" id="editModal{{ pt.permission_type_id }}" tabindex="-1" role="dialog" aria-labelledby="editModalLabel{{ pt.permission_type_id }}" aria-hidden="true">
+                                    <div class="modal-dialog" role="document">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="editModalLabel{{ pt.permission_type_id }}">Edit Permission Type</h5>
+                                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                    <span aria-hidden="true">&times;</span>
+                                                </button>
+                                            </div>
+                                            <form method="POST" action="{{ url_for('edit_permission_type', permission_type_id=pt.permission_type_id) }}">
+                                                <div class="modal-body">
+                                                    <div class="form-group">
+                                                        <label for="name{{ pt.permission_type_id }}">Name</label>
+                                                        <input type="text" class="form-control" id="name{{ pt.permission_type_id }}" name="name" value="{{ pt.name }}" required>
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label for="max_hours{{ pt.permission_type_id }}">Max Hours</label>
+                                                        <input type="number" step="0.5" class="form-control" id="max_hours{{ pt.permission_type_id }}" name="max_hours" value="{{ pt.max_hours }}" min="0.5" max="24">
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label for="description{{ pt.permission_type_id }}">Description</label>
+                                                        <input type="text" class="form-control" id="description{{ pt.permission_type_id }}" name="description" value="{{ pt.description }}">
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                                    <button type="submit" class="btn btn-primary">Save changes</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center">No permission types found</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

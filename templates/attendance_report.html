@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Attendance Report{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Attendance Report</h2>
+    
+    <!-- Filter Form -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-3">
+                    <label for="start_date" class="form-label">Start Date</label>
+                    <input type="date" class="form-control" id="start_date" name="start_date" 
+                           value="{{ start_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="end_date" class="form-label">End Date</label>
+                    <input type="date" class="form-control" id="end_date" name="end_date" 
+                           value="{{ end_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="emp_id" class="form-label">Employee</label>
+                    <select class="form-select" id="emp_id" name="emp_id">
+                        <option value="all">All Employees</option>
+                        {% for employee in employees %}
+                        <option value="{{ employee.emp_id }}" 
+                                {% if selected_emp_id == employee.emp_id|string %}selected{% endif %}>
+                            {{ employee.first_name }} {{ employee.last_name }} ({{ employee.employee_id }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary">Filter</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <h5 class="card-title">Total Days</h5>
+                    <p class="card-text display-6">{{ total_days }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <h5 class="card-title">Present Days</h5>
+                    <p class="card-text display-6">{{ present_days }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-info">
+                <div class="card-body">
+                    <h5 class="card-title">Total Hours</h5>
+                    <p class="card-text display-6">{{ "%.2f"|format(total_hours) }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body">
+                    <h5 class="card-title">Avg Hours/Day</h5>
+                    <p class="card-text display-6">{{ "%.2f"|format(avg_hours) }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attendance Table -->
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Date</th>
+                            <th>Check In</th>
+                            <th>Check Out</th>
+                            <th>Total Hours</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in attendance %}
+                        <tr>
+                            <td>{{ record.first_name }} {{ record.last_name }} ({{ record.employee_id }})</td>
+                            <td>{{ record.date }}</td>
+                            <td>{{ record.check_in_time }}</td>
+                            <td>{{ record.check_out_time if record.check_out_time else 'Not checked out' }}</td>
+                            <td>
+                                {% if record.total_hours is not none %}
+                                    {{ "%.2f"|format(record.total_hours) }}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-{% if record.status == 'present' %}success{% elif record.status == 'absent' %}danger{% elif record.status == 'half-day' %}warning{% else %}info{% endif %}">
+                                    {{ record.status }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>Permission Management</h2>
+    
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5>Permission Balance</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="alert alert-info">
+                        <strong>Allowed Hours:</strong> {{ balance.allowed_hours }}<br>
+                        <strong>Used Hours:</strong> {{ balance.used_hours }}<br>
+                        <strong>Remaining Hours:</strong> {{ balance.allowed_hours - balance.used_hours }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5>Apply for Permission</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('apply_permission') }}">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="permission_type_id">Permission Type</label>
+                            <select class="form-control" id="permission_type_id" name="permission_type_id" required>
+                                {% for pt in permission_types %}
+                                    <option value="{{ pt.permission_type_id }}">{{ pt.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="date">Date</label>
+                            <input type="date" class="form-control" id="date" name="date" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="start_time">Start Time</label>
+                            <input type="time" class="form-control" id="start_time" name="start_time" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="end_time">End Time</label>
+                            <input type="time" class="form-control" id="end_time" name="end_time" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="reason">Reason</label>
+                    <textarea class="form-control" id="reason" name="reason" rows="3" required></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Apply</button>
+            </form>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h5>My Permission Applications</h5>
+            <div class="btn-group float-right">
+                <a href="{{ url_for('employee_permissions', status='all') }}" class="btn btn-sm btn-outline-secondary {% if status == 'all' %}active{% endif %}">All</a>
+                <a href="{{ url_for('employee_permissions', status='pending') }}" class="btn btn-sm btn-outline-secondary {% if status == 'pending' %}active{% endif %}">Pending</a>
+                <a href="{{ url_for('employee_permissions', status='approved') }}" class="btn btn-sm btn-outline-secondary {% if status == 'approved' %}active{% endif %}">Approved</a>
+                <a href="{{ url_for('employee_permissions', status='rejected') }}" class="btn btn-sm btn-outline-secondary {% if status == 'rejected' %}active{% endif %}">Rejected</a>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Time</th>
+                            <th>Hours</th>
+                            <th>Reason</th>
+                            <th>Status</th>
+                            <th>Applied On</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for perm in permissions %}
+                        <tr>
+                            <td>{{ perm.date.strftime('%Y-%m-%d') }}</td>
+                            <td>{{ perm.permission_name }}</td>
+                            <td>{{ perm.start_time }} - {{ perm.end_time }}</td>
+                            <td>{{ perm.total_hours }}</td>
+                            <td>{{ perm.reason[:50] }}{% if perm.reason|length > 50 %}...{% endif %}</td>
+                            <td>
+                                {% if perm.status == 'pending' %}
+                                    <span class="badge badge-warning text-black">Pending</span>
+                                {% elif perm.status == 'approved' %}
+                                    <span class="badge badge-success text-black">Approved</span>
+                                {% else %}
+                                    <span class="badge badge-danger text-black">Rejected</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ perm.applied_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>
+                                {% if perm.status == 'pending' %}
+                                    <form method="POST" action="{{ url_for('cancel_permission', permission_id=perm.permission_id) }}" style="display:inline;">
+                                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to cancel this permission?')">Cancel</button>
+                                    </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center">No permission applications found</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Set default date to today
+    document.getElementById('date').valueAsDate = new Date();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>Permission Report</h2>
+    
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5>Filters</h5>
+        </div>
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('permission_report') }}">
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label for="start_date">Start Date</label>
+                            <input type="date" class="form-control" id="start_date" name="start_date" value="{{ start_date }}">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label for="end_date">End Date</label>
+                            <input type="date" class="form-control" id="end_date" name="end_date" value="{{ end_date }}">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label for="emp_id">Employee</label>
+                            <select class="form-control" id="emp_id" name="emp_id">
+                                <option value="all">All Employees</option>
+                                {% for emp in employees %}
+                                    <option value="{{ emp.emp_id }}" {% if selected_emp_id == emp.emp_id %}selected{% endif %}>
+                                        {{ emp.first_name }} {{ emp.last_name }} ({{ emp.employee_id }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label for="status">Status</label>
+                            <select class="form-control" id="status" name="status">
+                                <option value="all" {% if status == 'all' %}selected{% endif %}>All</option>
+                                <option value="pending" {% if status == 'pending' %}selected{% endif %}>Pending</option>
+                                <option value="approved" {% if status == 'approved' %}selected{% endif %}>Approved</option>
+                                <option value="rejected" {% if status == 'rejected' %}selected{% endif %}>Rejected</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Apply Filters</button>
+                <a href="{{ url_for('export_permissions', start_date=start_date, end_date=end_date, emp_id=(selected_emp_id if selected_emp_id else 'all'), status=status) }}" 
+                   class="btn btn-success">Export to CSV</a>
+            </form>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h5>Permission Applications</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Time</th>
+                            <th>Duration</th>
+                            <th>Reason</th>
+                            <th>Status</th>
+                            <th>Applied On</th>
+                            <th>Processed On</th>
+                            <th>Comments</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for perm in permissions %}
+                        <tr>
+                            <td>{{ perm.first_name }} {{ perm.last_name }} ({{ perm.employee_id }})</td>
+                            <td>{{ perm.date_only if perm.date_only else '-' }}</td>
+                            <td>{{ perm.permission_name }}</td>
+                            <td>
+                                {% if perm.start_time and perm.end_time %}
+                                    {{ perm.start_time }} - {{ perm.end_time }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>{{ perm.hours_display }}</td>
+                            <td>{{ perm.reason or '-' }}</td>
+                            <td>
+                                {% if perm.status == 'pending' %}
+                                    <span class="badge badge-warning text-black">Pending</span>
+                                {% elif perm.status == 'approved' %}
+                                    <span class="badge badge-success text-black">Approved</span>
+                                {% else %}
+                                    <span class="badge badge-danger text-black">Rejected</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ perm.formatted_applied_at if perm.formatted_applied_at else '-' }}</td>
+                            <td>{{ perm.formatted_processed_at if perm.formatted_processed_at else '-' }}</td>
+                            <td>{{ perm.comments or '-' }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="10" class="text-center">No permission applications found</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
