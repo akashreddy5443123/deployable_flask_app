@@ -1,7 +1,6 @@
 import os
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
-import pymysql
-pymysql.install_as_MySQLdb()
+from flask_mysqldb import MySQL
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import bcrypt
@@ -14,6 +13,8 @@ from flask import make_response
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'
+
+mysql = MySQL(app)
 
 # MySQL Configuration
 app.config['MYSQL_HOST'] = 'localhost'
