@@ -1,6 +1,7 @@
 import os
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
-from flask_mysqldb import MySQL
+import pymysql
+pymysql.install_as_MySQLdb()
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import bcrypt
