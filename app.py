@@ -2,7 +2,7 @@ import os
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
 import pymysql
 pymysql.install_as_MySQLdb()
-from flask import Flask
+from flask_mysqldb import MySQL
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import bcrypt
@@ -12,6 +12,7 @@ from io import StringIO
 from io import BytesIO
 from decimal import Decimal
 from flask import make_response
+mysql = MySQL(app)
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'
