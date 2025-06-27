@@ -23,7 +23,6 @@ app.config['MYSQL_DB'] = 'attendance_system'
 app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 app.config['MYSQL_CONNECT_TIMEOUT'] = 10
 
-mysql = MySQL(app)
 
 # File upload configuration
 UPLOAD_FOLDER = 'static/uploads/profile_pics'
