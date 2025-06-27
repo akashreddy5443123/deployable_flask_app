@@ -11,8 +11,6 @@ from io import StringIO
 from io import BytesIO
 from decimal import Decimal
 from flask import make_response
-mysql = MySQL(app)
-
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'
 
