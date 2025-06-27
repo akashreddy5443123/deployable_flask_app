@@ -24,6 +24,25 @@ app.config['MYSQL_DB'] = 'attendance_system'
 app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 app.config['MYSQL_CONNECT_TIMEOUT'] = 10
 
+class MySQLWrapper:
+    def __init__(self, app):
+        self.app = app
+        self._connection = None
+    
+    @property
+    def connection(self):
+        if not self._connection or not self._connection.open:
+            self._connection = pymysql.connect(
+                host=self.app.config['MYSQL_HOST'],
+                user=self.app.config['MYSQL_USER'],
+                password=self.app.config['MYSQL_PASSWORD'],
+                database=self.app.config['MYSQL_DB'],
+                cursorclass=pymysql.cursors.DictCursor,
+                autocommit=True
+            )
+        return self._connection
+
+mysql = MySQLWrapper(app)
 
 # File upload configuration
 UPLOAD_FOLDER = 'static/uploads/profile_pics'
