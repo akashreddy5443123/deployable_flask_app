@@ -31,10 +31,10 @@ class MySQLWrapper:
     def connection(self):
         if not self._connection or not self._connection.open:
             self._connection = pymysql.connect(
-                host=self.app.config['MYSQL_HOST'],
-                user=self.app.config['MYSQL_USER'],
-                password=self.app.config['MYSQL_PASSWORD'],
-                database=self.app.config['MYSQL_DB'],
+app.config['MYSQL_HOST'] = os.getenv('MYSQL_HOST', 'localhost')
+app.config['MYSQL_USER'] = os.getenv('MYSQL_USER', 'root')
+app.config['MYSQL_PASSWORD'] = os.getenv('MYSQL_PASSWORD', '12345')
+app.config['MYSQL_DB'] = os.getenv('MYSQL_DB', 'attendance_system')
                 cursorclass=pymysql.cursors.DictCursor,
                 autocommit=True
             )
