@@ -1,6 +1,6 @@
 import os
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
-from flask_mysqldb import MySQL
+import pymysql
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import bcrypt
@@ -14,16 +14,16 @@ from flask import make_response
 app = Flask(__name__)
 aapp.secret_key = os.getenv("SECRET_KEY", "your_fallback_secret_key")
 
-# MySQL Configuration using Railway Environment Variables
-app.config['MYSQL_HOST'] = os.getenv('MYSQLHOST', 'localhost')
-app.config['MYSQL_USER'] = os.getenv('MYSQLUSER', 'root')
-app.config['MYSQL_PASSWORD'] = os.getenv('MYSQLPASSWORD', '')
-app.config['MYSQL_DB'] = os.getenv('MYSQLDATABASE', 'attendance_system')
-app.config['MYSQL_PORT'] = int(os.getenv('MYSQLPORT', 3306))
-app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
-app.config['MYSQL_CONNECT_TIMEOUT'] = 10
+conn = pymysql.connect(
+    host=os.getenv('MYSQLHOST'),
+    user=os.getenv('MYSQLUSER'),
+    password=os.getenv('MYSQLPASSWORD'),
+    database=os.getenv('MYSQLDATABASE'),
+    port=int(os.getenv('MYSQLPORT', 3306)),
+    cursorclass=pymysql.cursors.DictCursor
+)
+cursor = conn.cursor()
 
-mysql = MySQL(app)
 
 # File upload configuration
 UPLOAD_FOLDER = 'static/uploads/profile_pics'
