@@ -12,13 +12,14 @@ from decimal import Decimal
 from flask import make_response
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key_here'
+aapp.secret_key = os.getenv("SECRET_KEY", "your_fallback_secret_key")
 
-# MySQL Configuration
-app.config['MYSQL_HOST'] = 'localhost'
-app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = '12345'
-app.config['MYSQL_DB'] = 'attendance_system'
+# MySQL Configuration using Railway Environment Variables
+app.config['MYSQL_HOST'] = os.getenv('MYSQLHOST', 'localhost')
+app.config['MYSQL_USER'] = os.getenv('MYSQLUSER', 'root')
+app.config['MYSQL_PASSWORD'] = os.getenv('MYSQLPASSWORD', '')
+app.config['MYSQL_DB'] = os.getenv('MYSQLDATABASE', 'attendance_system')
+app.config['MYSQL_PORT'] = int(os.getenv('MYSQLPORT', 3306))
 app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 app.config['MYSQL_CONNECT_TIMEOUT'] = 10
 
