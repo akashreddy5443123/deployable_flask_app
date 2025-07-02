@@ -12,7 +12,7 @@ from decimal import Decimal
 from flask import make_response
 
 app = Flask(__name__)
-aapp.secret_key = os.getenv("SECRET_KEY", "your_fallback_secret_key")
+app.secret_key = os.getenv("SECRET_KEY", "your_fallback_secret_key")
 
 conn = pymysql.connect(
     host=os.getenv('MYSQLHOST'),
