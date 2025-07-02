@@ -11,16 +11,19 @@ from io import StringIO
 from io import BytesIO
 from decimal import Decimal
 from flask import make_response
+import pymysql
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'
 
-app.config['MYSQL_HOST'] = os.getenv('MYSQL_HOST', 'localhost')
-app.config['MYSQL_PORT'] = int(os.getenv('MYSQL_PORT', 3306))
-app.config['MYSQL_USER'] = os.getenv('MYSQL_USER', 'root')
-app.config['MYSQL_PASSWORD'] = os.getenv('MYSQL_PASSWORD', '12345')
-app.config['MYSQL_DB'] = os.getenv('MYSQL_DB', 'attendance_system')
-app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
-app.config['MYSQL_CONNECT_TIMEOUT'] = 10
+conn = pymysql.connect(
+    host=os.getenv("MYSQLHOST"),
+    user=os.getenv("MYSQLUSER"),
+    password=os.getenv("MYSQLPASSWORD"),
+    db=os.getenv("MYSQLDATABASE"),
+    port=int(os.getenv("MYSQLPORT", 3306)),
+    cursorclass=pymysql.cursors.DictCursor,
+    autocommit=True
+)
 
 class MySQLWrapper:
     def __init__(self, app):
