@@ -37,8 +37,7 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # Helper functions
-def get_db_connection():
-    return mysql.connection.cursor()
+    return conn.cursor()
 
 def get_current_datetime():
     return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -79,7 +78,7 @@ def is_employee_logged_in():
     return 'emp_id' in session
 
 def get_employee_details(emp_id):
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     cur.execute("""
         SELECT e.*, d.dept_name, des.desig_name 
         FROM employee e 
@@ -92,7 +91,7 @@ def get_employee_details(emp_id):
     return employee
 
 def get_admin_details(admin_id):
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     cur.execute("SELECT * FROM admin WHERE admin_id = %s", (admin_id,))
     admin = cur.fetchone()
     cur.close()
@@ -139,7 +138,7 @@ def login():
         role = request.form['role']
         
         if role == 'admin':
-            cur = mysql.connection.cursor()
+            cur = conn.cursor()
             cur.execute("SELECT * FROM admin WHERE username = %s", (username,))
             admin = cur.fetchone()
             cur.close()
@@ -153,7 +152,7 @@ def login():
             else:
                 flash('Invalid username or password', 'danger')
         else:
-            cur = mysql.connection.cursor()
+            cur = conn.cursor()
             cur.execute("SELECT * FROM employee WHERE work_email = %s AND status = 'active'", (username,))
             employee = cur.fetchone()
             cur.close()
@@ -181,7 +180,7 @@ def admin_dashboard():
     if not is_admin_logged_in():
         return redirect(url_for('login'))
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     
     # Get total employees
     cur.execute("SELECT COUNT(*) as total_employees FROM employee")
@@ -232,7 +231,7 @@ def manage_employees():
     if not is_admin_logged_in():
         return redirect(url_for('login'))
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     cur.execute("""
         SELECT e.*, d.dept_name, des.desig_name 
         FROM employee e 
@@ -262,7 +261,7 @@ def manage_employees():
 def view_employee_leave_balance(emp_id):
     if not is_admin_logged_in():
         return redirect(url_for('login'))
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     # Get employee details
     cur.execute("""
         SELECT e.*, d.dept_name, des.desig_name 
@@ -299,7 +298,7 @@ def adjust_leave_balance(emp_id):
     days = request.form['days']  # Keep as string initially
     reason = request.form['reason']
     admin_id = session['admin_id']
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     try:
         # Convert days to Decimal for precise arithmetic
         try:
@@ -360,10 +359,10 @@ def adjust_leave_balance(emp_id):
             reason, 
             float(new_balance)
         ))
-        mysql.connection.commit()
+        conn.commit()
         flash('Leave balance updated successfully!', 'success')
     except Exception as e:
-        mysql.connection.rollback()
+        conn.rollback()
         flash(f'Error updating leave balance: {str(e)}', 'danger')
     finally:
         cur.close()
@@ -407,7 +406,7 @@ def add_employee():
                 profile_pic = filename
         
         # Insert into database
-        cur = mysql.connection.cursor()
+        cur = conn.cursor()
         try:
             cur.execute("""
                 INSERT INTO employee 
@@ -427,17 +426,17 @@ def add_employee():
                     VALUES (%s, %s, (SELECT max_days FROM leave_type WHERE leave_type_id = %s))
                 """, (emp_id, lt['leave_type_id'], lt['leave_type_id']))
             
-            mysql.connection.commit()
+            conn.commit()
             flash('Employee added successfully!', 'success')
             return redirect(url_for('manage_employees'))
         except Exception as e:
-            mysql.connection.rollback()
+            conn.rollback()
             flash(f'Error adding employee: {str(e)}', 'danger')
         finally:
             cur.close()
     
     # GET request - show form
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     cur.execute("SELECT * FROM department")
     departments = cur.fetchall()
     
@@ -455,7 +454,7 @@ def edit_employee(emp_id):
     if not is_admin_logged_in():
         return redirect(url_for('login'))
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     
     if request.method == 'POST':
         # Get form data
@@ -514,11 +513,11 @@ def edit_employee(emp_id):
                     WHERE emp_id = %s
                 """, (hashed_password, emp_id))
             
-            mysql.connection.commit()
+            conn.commit()
             flash('Employee updated successfully!', 'success')
             return redirect(url_for('manage_employees'))
         except Exception as e:
-            mysql.connection.rollback()
+            conn.rollback()
             flash(f'Error updating employee: {str(e)}', 'danger')
         finally:
             cur.close()
@@ -552,7 +551,7 @@ def delete_employee(emp_id):
     if not is_admin_logged_in():
         return redirect(url_for('login'))
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     try:
         # Delete all related records first
         cur.execute("DELETE FROM leave_balance WHERE emp_id = %s", (emp_id,))
@@ -561,10 +560,10 @@ def delete_employee(emp_id):
         
         # Then delete the employee
         cur.execute("DELETE FROM employee WHERE emp_id = %s", (emp_id,))
-        mysql.connection.commit()
+        conn.commit()
         flash('Employee deleted successfully!', 'success')
     except Exception as e:
-        mysql.connection.rollback()
+        conn.rollback()
         flash(f'Error deleting employee: {str(e)}', 'danger')
     finally:
         cur.close()
@@ -589,17 +588,17 @@ def reset_employee_password(emp_id):
     
     hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     try:
         cur.execute("""
             UPDATE employee 
             SET password_hash = %s 
             WHERE emp_id = %s
         """, (hashed_password, emp_id))
-        mysql.connection.commit()
+        conn.commit()
         flash('Password reset successfully!', 'success')
     except Exception as e:
-        mysql.connection.rollback()
+        conn.rollback()
         flash(f'Error resetting password: {str(e)}', 'danger')
     finally:
         cur.close()
@@ -612,7 +611,7 @@ def manage_departments():
     if not is_admin_logged_in():
         return redirect(url_for('login'))
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     cur.execute("SELECT * FROM department ORDER BY dept_name")
     departments = cur.fetchall()
     cur.close()
@@ -627,16 +626,16 @@ def add_department():
     dept_name = request.form['dept_name']
     description = request.form['description']
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     try:
         cur.execute("""
             INSERT INTO department (dept_name, description) 
             VALUES (%s, %s)
         """, (dept_name, description))
-        mysql.connection.commit()
+        conn.commit()
         flash('Department added successfully!', 'success')
     except Exception as e:
-        mysql.connection.rollback()
+        conn.rollback()
         flash(f'Error adding department: {str(e)}', 'danger')
     finally:
         cur.close()
@@ -651,17 +650,17 @@ def edit_department(dept_id):
     dept_name = request.form['dept_name']
     description = request.form['description']
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     try:
         cur.execute("""
             UPDATE department 
             SET dept_name = %s, description = %s 
             WHERE dept_id = %s
         """, (dept_name, description, dept_id))
-        mysql.connection.commit()
+        conn.commit()
         flash('Department updated successfully!', 'success')
     except Exception as e:
-        mysql.connection.rollback()
+        conn.rollback()
         flash(f'Error updating department: {str(e)}', 'danger')
     finally:
         cur.close()
@@ -673,7 +672,7 @@ def delete_department(dept_id):
     if not is_admin_logged_in():
         return redirect(url_for('login'))
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     try:
         # Check if department has employees
         cur.execute("SELECT COUNT(*) as emp_count FROM employee WHERE dept_id = %s", (dept_id,))
@@ -684,10 +683,10 @@ def delete_department(dept_id):
             return redirect(url_for('manage_departments'))
         
         cur.execute("DELETE FROM department WHERE dept_id = %s", (dept_id,))
-        mysql.connection.commit()
+        conn.commit()
         flash('Department deleted successfully!', 'success')
     except Exception as e:
-        mysql.connection.rollback()
+        conn.rollback()
         flash(f'Error deleting department: {str(e)}', 'danger')
     finally:
         cur.close()
@@ -700,7 +699,7 @@ def manage_designations():
     if not is_admin_logged_in():
         return redirect(url_for('login'))
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     cur.execute("SELECT * FROM designation ORDER BY desig_name")
     designations = cur.fetchall()
     cur.close()
@@ -715,16 +714,16 @@ def add_designation():
     desig_name = request.form['desig_name']
     description = request.form['description']
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     try:
         cur.execute("""
             INSERT INTO designation (desig_name, description) 
             VALUES (%s, %s)
         """, (desig_name, description))
-        mysql.connection.commit()
+        conn.commit()
         flash('Designation added successfully!', 'success')
     except Exception as e:
-        mysql.connection.rollback()
+        conn.rollback()
         flash(f'Error adding designation: {str(e)}', 'danger')
     finally:
         cur.close()
@@ -739,17 +738,17 @@ def edit_designation(desig_id):
     desig_name = request.form['desig_name']
     description = request.form['description']
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     try:
         cur.execute("""
             UPDATE designation 
             SET desig_name = %s, description = %s 
             WHERE desig_id = %s
         """, (desig_name, description, desig_id))
-        mysql.connection.commit()
+        conn.commit()
         flash('Designation updated successfully!', 'success')
     except Exception as e:
-        mysql.connection.rollback()
+        conn.rollback()
         flash(f'Error updating designation: {str(e)}', 'danger')
     finally:
         cur.close()
@@ -761,7 +760,7 @@ def delete_designation(desig_id):
     if not is_admin_logged_in():
         return redirect(url_for('login'))
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     try:
         # Check if designation has employees
         cur.execute("SELECT COUNT(*) as emp_count FROM employee WHERE desig_id = %s", (desig_id,))
@@ -772,10 +771,10 @@ def delete_designation(desig_id):
             return redirect(url_for('manage_designations'))
         
         cur.execute("DELETE FROM designation WHERE desig_id = %s", (desig_id,))
-        mysql.connection.commit()
+        conn.commit()
         flash('Designation deleted successfully!', 'success')
     except Exception as e:
-        mysql.connection.rollback()
+        conn.rollback()
         flash(f'Error deleting designation: {str(e)}', 'danger')
     finally:
         cur.close()
@@ -788,7 +787,7 @@ def manage_leave_types():
     if not is_admin_logged_in():
         return redirect(url_for('login'))
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     cur.execute("SELECT * FROM leave_type ORDER BY leave_name")
     leave_types = cur.fetchall()
     cur.close()
@@ -805,7 +804,7 @@ def add_leave_type():
     max_days = request.form['max_days']
     half_day_allowed = 1 if request.form.get('half_day_allowed') else 0
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     try:
         cur.execute("""
             INSERT INTO leave_type (leave_name, description, max_days,half_day_allowed) 
@@ -824,10 +823,10 @@ def add_leave_type():
                 VALUES (%s, %s, %s)
             """, (emp['emp_id'], leave_type_id, max_days))
 
-        mysql.connection.commit()
+        conn.commit()
         flash('Leave type added successfully!', 'success')
     except Exception as e:
-        mysql.connection.rollback()
+        conn.rollback()
         flash(f'Error adding leave type: {str(e)}', 'danger')
     finally:
         cur.close()
@@ -844,7 +843,7 @@ def edit_leave_type(leave_type_id):
     new_max_days = int(request.form['max_days'])
     half_day_allowed = 1 if request.form.get('half_day_allowed') else 0
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     try:
         # Get current max days
         cur.execute("SELECT max_days FROM leave_type WHERE leave_type_id = %s", (leave_type_id,))
@@ -866,10 +865,10 @@ def edit_leave_type(leave_type_id):
                 WHERE leave_type_id = %s
             """, (difference, leave_type_id))
 
-        mysql.connection.commit()
+        conn.commit()
         flash('Leave type updated successfully!', 'success')
     except Exception as e:
-        mysql.connection.rollback()
+        conn.rollback()
         flash(f'Error updating leave type: {str(e)}', 'danger')
     finally:
         cur.close()
@@ -881,7 +880,7 @@ def delete_leave_type(leave_type_id):
     if not is_admin_logged_in():
         return redirect(url_for('login'))
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     try:
         # Check if leave type is used in applications
         cur.execute("SELECT COUNT(*) as app_count FROM leave_application WHERE leave_type_id = %s", (leave_type_id,))
@@ -896,10 +895,10 @@ def delete_leave_type(leave_type_id):
         
         # Then delete from leave_type
         cur.execute("DELETE FROM leave_type WHERE leave_type_id = %s", (leave_type_id,))
-        mysql.connection.commit()
+        conn.commit()
         flash('Leave type deleted successfully!', 'success')
     except Exception as e:
-        mysql.connection.rollback()
+        conn.rollback()
         flash(f'Error deleting leave type: {str(e)}', 'danger')
     finally:
         cur.close()
@@ -914,7 +913,7 @@ def manage_leaves():
     
     status = request.args.get('status', 'pending')
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     cur.execute("""
         SELECT la.*, e.first_name, e.last_name, lt.leave_name 
         FROM leave_application la 
@@ -937,7 +936,7 @@ def leave_action(leave_id):
     comments = request.form.get('comments', '')
     admin_id = session['admin_id']
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     try:
         # Get leave details
         cur.execute("""
@@ -971,10 +970,10 @@ def leave_action(leave_id):
                 WHERE emp_id = %s AND leave_type_id = %s
             """, (days, leave['emp_id'], leave['leave_type_id']))
         
-        mysql.connection.commit()
+        conn.commit()
         flash(f'Leave application {action} successfully!', 'success')
     except Exception as e:
-        mysql.connection.rollback()
+        conn.rollback()
         flash(f'Error processing leave application: {str(e)}', 'danger')
     finally:
         cur.close()
@@ -991,7 +990,7 @@ def employee_permissions():
     status = request.args.get('status', 'all')
     current_month = date.today().strftime('%Y-%m')
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     
     # Get permission balance for current month
     cur.execute("""
@@ -1007,7 +1006,7 @@ def employee_permissions():
             INSERT INTO permission_balance (emp_id, month_year, allowed_hours, used_hours)
             VALUES (%s, %s, 3.00, 0.00)
         """, (emp_id, current_month))
-        mysql.connection.commit()
+        conn.commit()
         balance = {'allowed_hours': 3.00, 'used_hours': 0.00}
     
     # Get permission types
@@ -1075,7 +1074,7 @@ def apply_permission():
         
         current_month = date.today().strftime('%Y-%m')
         
-        cur = mysql.connection.cursor()
+        cur = conn.cursor()
         
         # Check permission balance
         cur.execute("""
@@ -1091,7 +1090,7 @@ def apply_permission():
                 INSERT INTO permission_balance (emp_id, month_year, allowed_hours, used_hours)
                 VALUES (%s, %s, 3.00, 0.00)
             """, (emp_id, current_month))
-            mysql.connection.commit()
+            conn.commit()
             balance = {'allowed_hours': 3.00, 'used_hours': 0.00}
         
         remaining_hours = float(balance['allowed_hours']) - float(balance['used_hours'])
@@ -1130,12 +1129,12 @@ def apply_permission():
             VALUES (%s, %s, %s, %s, %s, %s, %s)
         """, (emp_id, permission_type_id, date_str, start_time, end_time, total_hours, reason))
         
-        mysql.connection.commit()
+        conn.commit()
         flash('Permission application submitted successfully!', 'success')
     except ValueError as e:
         flash('Invalid date or time format', 'danger')
     except Exception as e:
-        mysql.connection.rollback()
+        conn.rollback()
         flash(f'Error applying for permission: {str(e)}', 'danger')
     finally:
         cur.close()
@@ -1149,7 +1148,7 @@ def cancel_permission(permission_id):
     
     emp_id = session['emp_id']
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     try:
         # Check if permission can be cancelled (status is pending)
         cur.execute("""
@@ -1171,10 +1170,10 @@ def cancel_permission(permission_id):
             DELETE FROM permission_application 
             WHERE permission_id = %s
         """, (permission_id,))
-        mysql.connection.commit()
+        conn.commit()
         flash('Permission application cancelled successfully!', 'success')
     except Exception as e:
-        mysql.connection.rollback()
+        conn.rollback()
         flash(f'Error cancelling permission: {str(e)}', 'danger')
     finally:
         cur.close()
@@ -1190,7 +1189,7 @@ def manage_permissions():
     status = request.args.get('status', 'pending')
     month_year = request.args.get('month', date.today().strftime('%Y-%m'))
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     
     # Get permission applications
     cur.execute("""
@@ -1224,7 +1223,7 @@ def permission_action(permission_id):
     comments = request.form.get('comments', '')
     admin_id = session['admin_id']
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     try:
         # Get permission details
         cur.execute("""
@@ -1269,10 +1268,10 @@ def permission_action(permission_id):
                     VALUES (%s, %s, 3.00, %s)
                 """, (permission['emp_id'], month_year, permission['total_hours']))
         
-        mysql.connection.commit()
+        conn.commit()
         flash(f'Permission application {action} successfully!', 'success')
     except Exception as e:
-        mysql.connection.rollback()
+        conn.rollback()
         flash(f'Error processing permission application: {str(e)}', 'danger')
     finally:
         cur.close()
@@ -1284,7 +1283,7 @@ def manage_permission_types():
     if not is_admin_logged_in():
         return redirect(url_for('login'))
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     cur.execute("SELECT * FROM permission_type ORDER BY name")
     permission_types = cur.fetchall()
     cur.close()
@@ -1301,16 +1300,16 @@ def add_permission_type():
     description = request.form['description']
     max_hours = request.form.get('max_hours', 3.00)
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     try:
         cur.execute("""
             INSERT INTO permission_type (name, description, max_hours)
             VALUES (%s, %s, %s)
         """, (name, description, max_hours))
-        mysql.connection.commit()
+        conn.commit()
         flash('Permission type added successfully!', 'success')
     except Exception as e:
-        mysql.connection.rollback()
+        conn.rollback()
         flash(f'Error adding permission type: {str(e)}', 'danger')
     finally:
         cur.close()
@@ -1326,17 +1325,17 @@ def edit_permission_type(permission_type_id):
     description = request.form['description']
     max_hours = request.form.get('max_hours', 3.00)
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     try:
         cur.execute("""
             UPDATE permission_type 
             SET name = %s, description = %s, max_hours = %s
             WHERE permission_type_id = %s
         """, (name, description, max_hours, permission_type_id))
-        mysql.connection.commit()
+        conn.commit()
         flash('Permission type updated successfully!', 'success')
     except Exception as e:
-        mysql.connection.rollback()
+        conn.rollback()
         flash(f'Error updating permission type: {str(e)}', 'danger')
     finally:
         cur.close()
@@ -1348,7 +1347,7 @@ def delete_permission_type(permission_type_id):
     if not is_admin_logged_in():
         return redirect(url_for('login'))
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     try:
         # Check if permission type is used in applications
         cur.execute("""
@@ -1363,10 +1362,10 @@ def delete_permission_type(permission_type_id):
             return redirect(url_for('manage_permission_types'))
         
         cur.execute("DELETE FROM permission_type WHERE permission_type_id = %s", (permission_type_id,))
-        mysql.connection.commit()
+        conn.commit()
         flash('Permission type deleted successfully!', 'success')
     except Exception as e:
-        mysql.connection.rollback()
+        conn.rollback()
         flash(f'Error deleting permission type: {str(e)}', 'danger')
     finally:
         cur.close()
@@ -1385,7 +1384,7 @@ def permission_report():
         emp_id = request.args.get('emp_id', 'all')
         status = request.args.get('status', 'all')
         
-        cur = mysql.connection.cursor()
+        cur = conn.cursor()
         
         # Get all active employees for filter dropdown
         cur.execute("SELECT emp_id, first_name, last_name, employee_id FROM employee WHERE status = 'active'")
@@ -1480,7 +1479,7 @@ def export_permissions():
         emp_id = request.args.get('emp_id', None)
         status = request.args.get('status', 'all')
         
-        cur = mysql.connection.cursor()
+        cur = conn.cursor()
         
         # Build query based on filters
         query = """
@@ -1612,7 +1611,7 @@ def manage_attendance():
     
     date_filter = request.args.get('date', date.today().strftime('%Y-%m-%d'))
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     cur.execute("""
         SELECT a.*, e.first_name, e.last_name, e.employee_id 
         FROM attendance a 
@@ -1653,16 +1652,16 @@ def manual_attendance_entry():
     
     total_hours = calculate_work_hours(check_in_datetime, check_out_datetime) if check_out else None
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     try:
         cur.execute("""
             INSERT INTO attendance (emp_id, check_in, check_out, total_hours, status) 
             VALUES (%s, %s, %s, %s, 'present')
         """, (emp_id, check_in_datetime, check_out_datetime, total_hours))
-        mysql.connection.commit()
+        conn.commit()
         flash('Attendance recorded successfully!', 'success')
     except Exception as e:
-        mysql.connection.rollback()
+        conn.rollback()
         flash(f'Error recording attendance: {str(e)}', 'danger')
     finally:
         cur.close()
@@ -1679,7 +1678,7 @@ def update_attendance(att_id):
     
     total_hours = calculate_work_hours(check_in, check_out) if check_out else None
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     try:
         if check_out:
             cur.execute("""
@@ -1694,10 +1693,10 @@ def update_attendance(att_id):
                 WHERE att_id = %s
             """, (check_in, att_id))
         
-        mysql.connection.commit()
+        conn.commit()
         flash('Attendance updated successfully!', 'success')
     except Exception as e:
-        mysql.connection.rollback()
+        conn.rollback()
         flash(f'Error updating attendance: {str(e)}', 'danger')
     finally:
         cur.close()
@@ -1710,17 +1709,17 @@ def delete_attendance(att_id):
     if not is_admin_logged_in():
         return redirect(url_for('login'))
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     try:
         # Get date before deleting for redirect
         cur.execute("SELECT DATE(check_in) as date FROM attendance WHERE att_id = %s", (att_id,))
         date_str = cur.fetchone()['date']
         
         cur.execute("DELETE FROM attendance WHERE att_id = %s", (att_id,))
-        mysql.connection.commit()
+        conn.commit()
         flash('Attendance record deleted successfully!', 'success')
     except Exception as e:
-        mysql.connection.rollback()
+        conn.rollback()
         flash(f'Error deleting attendance record: {str(e)}', 'danger')
         return redirect(url_for('manage_attendance'))
     finally:
@@ -1739,7 +1738,7 @@ def attendance_report():
     end_date = request.args.get('end_date', date.today().strftime('%Y-%m-%d'))
     emp_id = request.args.get('emp_id', None)
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     
     # Get all active employees for filter dropdown
     cur.execute("SELECT emp_id, first_name, last_name, employee_id FROM employee WHERE status = 'active'")
@@ -1813,7 +1812,7 @@ def export_leave():
     end_date = request.args.get('end_date', '')
     emp_id = request.args.get('emp_id', None)
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     
     # Build query based on filters (same as leave_report)
     query = """
@@ -1895,7 +1894,7 @@ def leave_report():
     end_date = request.args.get('end_date', '')
     emp_id = request.args.get('emp_id', None)
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     
     # Get all active employees for filter dropdown
     cur.execute("SELECT emp_id, first_name, last_name, employee_id FROM employee WHERE status = 'active'")
@@ -1946,7 +1945,7 @@ def export_attendance():
     end_date = request.args.get('end_date', '')
     emp_id = request.args.get('emp_id', None)
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     
     query = """
         SELECT e.employee_id, e.first_name, e.last_name, 
@@ -2018,7 +2017,7 @@ def employee_dashboard():
     emp_id = session['emp_id']
     employee = get_employee_details(emp_id)
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     
     # Get today's attendance
     today = date.today().strftime('%Y-%m-%d')
@@ -2087,7 +2086,7 @@ def employee_attendance():
     emp_id = session['emp_id']
     month = request.args.get('month', date.today().strftime('%Y-%m'))
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     cur.execute("""
         SELECT DATE(check_in) as date, 
                TIME(check_in) as check_in, 
@@ -2122,7 +2121,7 @@ def employee_check_in():
     current_time = get_current_datetime()
     today = date.today().strftime('%Y-%m-%d')
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     try:
         # Check if already checked in today
         cur.execute("""
@@ -2153,10 +2152,10 @@ def employee_check_in():
             VALUES (%s, %s, 'present')
         """, (emp_id, current_time))
         
-        mysql.connection.commit()
+        conn.commit()
         flash('Check-in recorded successfully!', 'success')
     except Exception as e:
-        mysql.connection.rollback()
+        conn.rollback()
         flash(f'Error recording check-in: {str(e)}', 'danger')
         app.logger.error(f"Error in check_in: {str(e)}")  # Add logging
     finally:
@@ -2173,7 +2172,7 @@ def employee_check_out():
     emp_id = session['emp_id']
     current_time = get_current_datetime()
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     try:
         # Get today's check-in
         today = date.today().strftime('%Y-%m-%d')
@@ -2197,10 +2196,10 @@ def employee_check_out():
             SET check_out = %s, total_hours = %s 
             WHERE att_id = %s
         """, (current_time, total_hours, attendance['att_id']))
-        mysql.connection.commit()
+        conn.commit()
         flash('Check-out recorded successfully!', 'success')
     except Exception as e:
-        mysql.connection.rollback()
+        conn.rollback()
         flash(f'Error recording check-out: {str(e)}', 'danger')
     finally:
         cur.close()
@@ -2216,7 +2215,7 @@ def employee_leaves():
     emp_id = session['emp_id']
     status = request.args.get('status', 'all')
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     
     # Get leave balance
     cur.execute("""
@@ -2284,7 +2283,7 @@ def apply_leave():
     # Calculate days
     days = calculate_leave_days(start_dt, end_dt, leave_duration)
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     try:
         # Check leave balance and if half-day is allowed
         cur.execute("""
@@ -2338,10 +2337,10 @@ def apply_leave():
             VALUES (%s, %s, %s, %s, %s, %s)
         """, (emp_id, leave_type_id, start_date, end_date, leave_duration, reason))
         
-        mysql.connection.commit()
+        conn.commit()
         flash('Leave application submitted successfully!', 'success')
     except Exception as e:
-        mysql.connection.rollback()
+        conn.rollback()
         flash(f'Error applying for leave: {str(e)}', 'danger')
     finally:
         cur.close()
@@ -2355,7 +2354,7 @@ def cancel_leave(leave_id):
     
     emp_id = session['emp_id']
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     try:
         # Check if leave can be cancelled (status is pending)
         cur.execute("""
@@ -2377,10 +2376,10 @@ def cancel_leave(leave_id):
             DELETE FROM leave_application 
             WHERE leave_id = %s
         """, (leave_id,))
-        mysql.connection.commit()
+        conn.commit()
         flash('Leave application cancelled successfully!', 'success')
     except Exception as e:
-        mysql.connection.rollback()
+        conn.rollback()
         flash(f'Error cancelling leave: {str(e)}', 'danger')
     finally:
         cur.close()
@@ -2411,7 +2410,7 @@ def change_employee_password():
         flash('Password must be at least 8 characters long', 'danger')
         return redirect(url_for('employee_profile'))
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     try:
         # Verify current password
         cur.execute("SELECT password_hash FROM employee WHERE emp_id = %s", (emp_id,))
@@ -2428,10 +2427,10 @@ def change_employee_password():
             SET password_hash = %s 
             WHERE emp_id = %s
         """, (hashed_password, emp_id))
-        mysql.connection.commit()
+        conn.commit()
         flash('Password changed successfully!', 'success')
     except Exception as e:
-        mysql.connection.rollback()
+        conn.rollback()
         flash(f'Error changing password: {str(e)}', 'danger')
     finally:
         cur.close()
@@ -2456,7 +2455,7 @@ def update_employee_profile_pic():
     
     if file and allowed_file(file.filename):
         # Get employee details to use the employee_id in filename
-        cur = mysql.connection.cursor()
+        cur = conn.cursor()
         cur.execute("SELECT employee_id FROM employee WHERE emp_id = %s", (emp_id,))
         employee = cur.fetchone()
         cur.close()
@@ -2469,7 +2468,7 @@ def update_employee_profile_pic():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         
         # Delete old profile pic if exists
-        cur = mysql.connection.cursor()
+        cur = conn.cursor()
         cur.execute("SELECT profile_pic FROM employee WHERE emp_id = %s", (emp_id,))
         old_pic = cur.fetchone()['profile_pic']
         
@@ -2489,10 +2488,10 @@ def update_employee_profile_pic():
                 SET profile_pic = %s 
                 WHERE emp_id = %s
             """, (filename, emp_id))
-            mysql.connection.commit()
+            conn.commit()
             flash('Profile picture updated successfully!', 'success')
         except Exception as e:
-            mysql.connection.rollback()
+            conn.rollback()
             flash(f'Error updating profile picture: {str(e)}', 'danger')
         finally:
             cur.close()
@@ -2512,7 +2511,7 @@ def employee_calendar():
     year = request.args.get('year', date.today().year)
     month = request.args.get('month', date.today().month)
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     
     # Get attendance for the month
     cur.execute("""
@@ -2607,7 +2606,7 @@ def employee_policies():
     
     category = request.args.get('category', 'all')
     
-    cur = mysql.connection.cursor()
+    cur = conn.cursor()
     
     if category == 'all':
         cur.execute("SELECT * FROM company_policy ORDER BY created_at DESC")
