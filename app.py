@@ -1,7 +1,6 @@
 import os
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
-import pymysql
-pymysql.install_as_MySQLdb()
+from flask_mysqldb import MySQL
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import bcrypt
@@ -11,39 +10,19 @@ from io import StringIO
 from io import BytesIO
 from decimal import Decimal
 from flask import make_response
-import pymysql
+
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'
 
-conn = pymysql.connect(
-    host=os.getenv("MYSQLHOST"),
-    user=os.getenv("MYSQLUSER"),
-    password=os.getenv("MYSQLPASSWORD"),
-    db=os.getenv("MYSQLDATABASE"),
-    port=int(os.getenv("MYSQLPORT", 3306)),
-    cursorclass=pymysql.cursors.DictCursor,
-    autocommit=True
-)
+# MySQL Configuration
+app.config['MYSQL_HOST'] = 'localhost'
+app.config['MYSQL_USER'] = 'root'
+app.config['MYSQL_PASSWORD'] = '12345'
+app.config['MYSQL_DB'] = 'attendance_system'
+app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
+app.config['MYSQL_CONNECT_TIMEOUT'] = 10
 
-class MySQLWrapper:
-    def __init__(self, app):
-        self.app = app
-        self._connection = None
-    
-    @property
-    def connection(self):
-        if not self._connection or not self._connection.open:
-            self._connection = pymysql.connect(
-app.config['MYSQL_HOST'] = os.getenv('MYSQL_HOST', 'localhost')
-app.config['MYSQL_USER'] = os.getenv('MYSQL_USER', 'root')
-app.config['MYSQL_PASSWORD'] = os.getenv('MYSQL_PASSWORD', '12345')
-app.config['MYSQL_DB'] = os.getenv('MYSQL_DB', 'attendance_system')
-                cursorclass=pymysql.cursors.DictCursor,
-                autocommit=True
-            )
-        return self._connection
-
-mysql = MySQLWrapper(app)
+mysql = MySQL(app)
 
 # File upload configuration
 UPLOAD_FOLDER = 'static/uploads/profile_pics'
