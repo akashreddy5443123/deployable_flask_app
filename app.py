@@ -15,6 +15,8 @@ app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "your_fallback_secret_key")
 
 print("DEBUG: MYSQLHOST =", repr(os.getenv('MYSQLHOST')))
+DATABASE_URL = os.getenv('MYSQL_PUBLIC_URL')
+print(DATABASE_URL)
 
 try:
     conn = pymysql.connect(
