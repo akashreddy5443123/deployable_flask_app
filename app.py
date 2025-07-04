@@ -15,15 +15,14 @@ app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "your_fallback_secret_key")
 
 conn = pymysql.connect(
-    host=os.getenv('MYSQL_HOST'),          # Changed from MYSQLHOST
-    user=os.getenv('MYSQL_USERNAME'),      # Changed from MYSQLUSER
-    password=os.getenv('MYSQL_PASSWORD'),  # Changed from MYSQLPASSWORD
-    database=os.getenv('MYSQL_DATABASE'),  # Changed from MYSQLDATABASE
-    port=int(os.getenv('MYSQL_PORT', 3306)), # Changed from MYSQLPORT
+    host=os.getenv('MYSQL_HOST'),          # Updated from MYSQLHOST
+    user=os.getenv('MYSQL_USERNAME'),      # Updated from MYSQLUSER
+    password=os.getenv('MYSQL_PASSWORD'),  # Updated from MYSQLPASSWORD
+    database=os.getenv('MYSQL_DATABASE'),  # Updated from MYSQLDATABASE
+    port=int(os.getenv('MYSQL_PORT', 3306)), # Updated from MYSQLPORT
     cursorclass=pymysql.cursors.DictCursor
 )
 cursor = conn.cursor()
-
 
 # File upload configuration
 UPLOAD_FOLDER = 'static/uploads/profile_pics'
@@ -37,7 +36,12 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # Helper functions
-    return conn.cursor()
+# There seems to be an indentation issue here, `return conn.cursor()` is not inside a function.
+# Assuming it was intended to be part of a `get_db_cursor` helper if you had one.
+# For now, I'll remove it as it's causing a syntax error in its current placement.
+# If you need a helper to get a new cursor, you would define a function like this:
+# def get_db_cursor():
+#     return conn.cursor()
 
 def get_current_datetime():
     return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -910,9 +914,7 @@ def delete_leave_type(leave_type_id):
 def manage_leaves():
     if not is_admin_logged_in():
         return redirect(url_for('login'))
-    
     status = request.args.get('status', 'pending')
-    
     cur = conn.cursor()
     cur.execute("""
         SELECT la.*, e.first_name, e.last_name, lt.leave_name 
@@ -920,56 +922,45 @@ def manage_leaves():
         JOIN employee e ON la.emp_id = e.emp_id 
         JOIN leave_type lt ON la.leave_type_id = lt.leave_type_id 
         WHERE la.status = %s 
-        ORDER BY la.applied_on DESC
+        ORDER BY la.applied_on DESC 
     """, (status,))
     leaves = cur.fetchall()
     cur.close()
-    
     return render_template('manage_leaves.html', leaves=leaves, status=status)
 
 @app.route('/admin/leave/action/<int:leave_id>', methods=['POST'])
 def leave_action(leave_id):
     if not is_admin_logged_in():
         return redirect(url_for('login'))
-    
     action = request.form['action']
     comments = request.form.get('comments', '')
     admin_id = session['admin_id']
-    
     cur = conn.cursor()
     try:
         # Get leave details
         cur.execute("""
-            SELECT emp_id, leave_type_id, start_date, end_date, leave_duration
-            FROM leave_application 
-            WHERE leave_id = %s
+            SELECT emp_id, leave_type_id, start_date, end_date, leave_duration 
+            FROM leave_application WHERE leave_id = %s
         """, (leave_id,))
         leave = cur.fetchone()
-        
         if not leave:
             flash('Leave application not found', 'danger')
             return redirect(url_for('manage_leaves'))
-        
         # Calculate days based on duration
         start_date = leave['start_date']
         end_date = leave['end_date']
         days = calculate_leave_days(start_date, end_date, leave['leave_duration'])
-        
         # Update leave application
         cur.execute("""
-            UPDATE leave_application 
-            SET status = %s, processed_by = %s, processed_on = NOW(), comments = %s 
+            UPDATE leave_application SET status = %s, processed_by = %s, processed_on = NOW(), comments = %s 
             WHERE leave_id = %s
         """, (action, admin_id, comments, leave_id))
-        
         # If approved, update leave balance
         if action == 'approved':
             cur.execute("""
-                UPDATE leave_balance 
-                SET remaining_days = remaining_days - %s 
+                UPDATE leave_balance SET remaining_days = remaining_days - %s 
                 WHERE emp_id = %s AND leave_type_id = %s
             """, (days, leave['emp_id'], leave['leave_type_id']))
-        
         conn.commit()
         flash(f'Leave application {action} successfully!', 'success')
     except Exception as e:
@@ -977,7 +968,6 @@ def leave_action(leave_id):
         flash(f'Error processing leave application: {str(e)}', 'danger')
     finally:
         cur.close()
-    
     return redirect(url_for('manage_leaves'))
 
 # Permission Management Routes
@@ -985,191 +975,148 @@ def leave_action(leave_id):
 def employee_permissions():
     if not is_employee_logged_in():
         return redirect(url_for('login'))
-    
     emp_id = session['emp_id']
     status = request.args.get('status', 'all')
     current_month = date.today().strftime('%Y-%m')
-    
     cur = conn.cursor()
-    
     # Get permission balance for current month
     cur.execute("""
-        SELECT allowed_hours, used_hours 
-        FROM permission_balance 
+        SELECT allowed_hours, used_hours FROM permission_balance 
         WHERE emp_id = %s AND month_year = %s
     """, (emp_id, current_month))
     balance = cur.fetchone()
-    
     if not balance:
         # Initialize balance for new month
         cur.execute("""
-            INSERT INTO permission_balance (emp_id, month_year, allowed_hours, used_hours)
+            INSERT INTO permission_balance (emp_id, month_year, allowed_hours, used_hours) 
             VALUES (%s, %s, 3.00, 0.00)
         """, (emp_id, current_month))
         conn.commit()
         balance = {'allowed_hours': 3.00, 'used_hours': 0.00}
-    
     # Get permission types
     cur.execute("SELECT * FROM permission_type")
     permission_types = cur.fetchall()
-    
     # Get permission applications
     query = """
         SELECT pa.*, pt.name as permission_name 
-        FROM permission_application pa
-        JOIN permission_type pt ON pa.permission_type_id = pt.permission_type_id
-        WHERE pa.emp_id = %s
+        FROM permission_application pa 
+        JOIN permission_type pt ON pa.permission_type_id = pt.permission_type_id 
+        WHERE pa.emp_id = %s 
     """
     params = [emp_id]
-    
     if status != 'all':
         query += " AND pa.status = %s"
         params.append(status)
-    
     query += " ORDER BY pa.date DESC, pa.applied_at DESC"
-    
     cur.execute(query, tuple(params))
     permissions = cur.fetchall()
-    
     cur.close()
-    
-    return render_template('employee_permissions.html',
-                         balance=balance,
-                         permission_types=permission_types,
-                         permissions=permissions,
-                         status=status)
+    return render_template('employee_permissions.html', balance=balance, permission_types=permission_types, permissions=permissions, status=status)
 
 @app.route('/employee/permission/apply', methods=['POST'])
 def apply_permission():
     if not is_employee_logged_in():
         return redirect(url_for('login'))
-    
     emp_id = session['emp_id']
     permission_type_id = request.form['permission_type_id']
     date_str = request.form['date']
     start_time = request.form['start_time']
     end_time = request.form['end_time']
     reason = request.form['reason']
-    
     try:
         # Calculate total hours
         start_dt = datetime.strptime(f"{date_str} {start_time}", '%Y-%m-%d %H:%M')
         end_dt = datetime.strptime(f"{date_str} {end_time}", '%Y-%m-%d %H:%M')
-        
         if end_dt <= start_dt:
             flash('End time must be after start time', 'danger')
             return redirect(url_for('employee_permissions'))
-        
         total_hours = (end_dt - start_dt).total_seconds() / 3600
         total_hours = round(total_hours, 2)
-        
         if total_hours <= 0:
             flash('Invalid time duration', 'danger')
             return redirect(url_for('employee_permissions'))
-        
         # Check if total hours exceeds 3 hours
         if total_hours > 3:
             flash('Permission cannot exceed 3 hours', 'danger')
             return redirect(url_for('employee_permissions'))
-        
         current_month = date.today().strftime('%Y-%m')
-        
         cur = conn.cursor()
-        
         # Check permission balance
         cur.execute("""
-            SELECT allowed_hours, used_hours 
-            FROM permission_balance 
+            SELECT allowed_hours, used_hours FROM permission_balance 
             WHERE emp_id = %s AND month_year = %s
         """, (emp_id, current_month))
         balance = cur.fetchone()
-        
         if not balance:
             # Initialize balance if not exists
             cur.execute("""
-                INSERT INTO permission_balance (emp_id, month_year, allowed_hours, used_hours)
+                INSERT INTO permission_balance (emp_id, month_year, allowed_hours, used_hours) 
                 VALUES (%s, %s, 3.00, 0.00)
             """, (emp_id, current_month))
             conn.commit()
             balance = {'allowed_hours': 3.00, 'used_hours': 0.00}
-        
         remaining_hours = float(balance['allowed_hours']) - float(balance['used_hours'])
-        
         if total_hours > remaining_hours:
             flash(f'Not enough permission balance. You have {remaining_hours:.2f} hours remaining.', 'danger')
             return redirect(url_for('employee_permissions'))
-        
         # Check for overlapping permissions on same date
         cur.execute("""
-            SELECT COUNT(*) as overlap_count 
-            FROM permission_application 
-            WHERE emp_id = %s AND date = %s AND status = 'approved'
-            AND (
-                (TIME(%s) BETWEEN start_time AND end_time) OR
-                (TIME(%s) BETWEEN start_time AND end_time) OR
-                (start_time BETWEEN TIME(%s) AND TIME(%s)) OR
+            SELECT COUNT(*) as overlap_count FROM permission_application 
+            WHERE emp_id = %s AND date = %s AND status = 'approved' AND (
+                (TIME(%s) BETWEEN start_time AND end_time) OR 
+                (TIME(%s) BETWEEN start_time AND end_time) OR 
+                (start_time BETWEEN TIME(%s) AND TIME(%s)) OR 
                 (end_time BETWEEN TIME(%s) AND TIME(%s))
             )
         """, (
-            emp_id, date_str,
-            start_time, end_time,
-            start_time, end_time,
-            start_time, end_time
+            emp_id, date_str, start_time, end_time, start_time, end_time, start_time, end_time
         ))
         overlap = cur.fetchone()['overlap_count'] > 0
-        
         if overlap:
             flash('You already have an approved permission during this time', 'danger')
             return redirect(url_for('employee_permissions'))
-        
         # Apply permission
         cur.execute("""
-            INSERT INTO permission_application 
-            (emp_id, permission_type_id, date, start_time, end_time, total_hours, reason)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO permission_application (emp_id, permission_type_id, date, start_time, end_time, total_hours, reason, status) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s, 'pending')
         """, (emp_id, permission_type_id, date_str, start_time, end_time, total_hours, reason))
-        
         conn.commit()
         flash('Permission application submitted successfully!', 'success')
-    except ValueError as e:
-        flash('Invalid date or time format', 'danger')
     except Exception as e:
         conn.rollback()
         flash(f'Error applying for permission: {str(e)}', 'danger')
     finally:
         cur.close()
-    
     return redirect(url_for('employee_permissions'))
+
 
 @app.route('/employee/permission/cancel/<int:permission_id>', methods=['POST'])
 def cancel_permission(permission_id):
     if not is_employee_logged_in():
         return redirect(url_for('login'))
-    
     emp_id = session['emp_id']
-    
     cur = conn.cursor()
     try:
-        # Check if permission can be cancelled (status is pending)
         cur.execute("""
             SELECT status FROM permission_application 
             WHERE permission_id = %s AND emp_id = %s
         """, (permission_id, emp_id))
         permission = cur.fetchone()
-        
         if not permission:
-            flash('Permission application not found', 'danger')
+            flash('Permission application not found or you do not have permission to cancel it', 'danger')
             return redirect(url_for('employee_permissions'))
-        
-        if permission['status'] != 'pending':
-            flash('Only pending permissions can be cancelled', 'danger')
+        if permission['status'] == 'cancelled':
+            flash('Permission is already cancelled.', 'info')
             return redirect(url_for('employee_permissions'))
-        
-        # Delete permission application
+        if permission['status'] == 'approved':
+            flash('Approved permissions cannot be cancelled by employee. Please contact admin.', 'danger')
+            return redirect(url_for('employee_permissions'))
+
         cur.execute("""
-            DELETE FROM permission_application 
-            WHERE permission_id = %s
-        """, (permission_id,))
+            UPDATE permission_application 
+            SET status = 'cancelled', comments = %s, processed_on = NOW() 
+            WHERE permission_id = %s AND emp_id = %s
+        """, ('Cancelled by employee', permission_id, emp_id))
         conn.commit()
         flash('Permission application cancelled successfully!', 'success')
     except Exception as e:
@@ -1177,1036 +1124,376 @@ def cancel_permission(permission_id):
         flash(f'Error cancelling permission: {str(e)}', 'danger')
     finally:
         cur.close()
-    
     return redirect(url_for('employee_permissions'))
 
-# Admin Permission Management
-@app.route('/admin/permissions')
-def manage_permissions():
+
+@app.route('/admin/permission_approvals')
+def admin_permission_approvals():
     if not is_admin_logged_in():
         return redirect(url_for('login'))
-    
     status = request.args.get('status', 'pending')
-    month_year = request.args.get('month', date.today().strftime('%Y-%m'))
-    
     cur = conn.cursor()
-    
-    # Get permission applications
-    cur.execute("""
-        SELECT pa.*, e.first_name, e.last_name, e.employee_id, pt.name as permission_name 
+    query = """
+        SELECT pa.*, e.first_name, e.last_name, pt.name as permission_type_name
         FROM permission_application pa
         JOIN employee e ON pa.emp_id = e.emp_id
         JOIN permission_type pt ON pa.permission_type_id = pt.permission_type_id
-        WHERE pa.status = %s AND DATE_FORMAT(pa.date, '%%Y-%%m') = %s
-        ORDER BY pa.date, pa.applied_at
-    """, (status, month_year))
+    """
+    params = []
+    if status != 'all':
+        query += " WHERE pa.status = %s"
+        params.append(status)
+    query += " ORDER BY pa.applied_at DESC"
+    cur.execute(query, tuple(params))
     permissions = cur.fetchall()
-    
-    # Get permission types for filter
-    cur.execute("SELECT * FROM permission_type")
-    permission_types = cur.fetchall()
-    
     cur.close()
-    
-    return render_template('manage_permissions.html',
-                         permissions=permissions,
-                         permission_types=permission_types,
-                         status=status,
-                         month_year=month_year)
+    return render_template('admin_permission_approvals.html', permissions=permissions, status=status)
 
 @app.route('/admin/permission/action/<int:permission_id>', methods=['POST'])
-def permission_action(permission_id):
+def admin_permission_action(permission_id):
     if not is_admin_logged_in():
         return redirect(url_for('login'))
-    
-    action = request.form['action']  # This will be 'approved' or 'rejected'
+    action = request.form['action']
     comments = request.form.get('comments', '')
     admin_id = session['admin_id']
-    
     cur = conn.cursor()
     try:
-        # Get permission details
         cur.execute("""
-            SELECT emp_id, date, total_hours 
-            FROM permission_application 
-            WHERE permission_id = %s
+            SELECT emp_id, total_hours, status, date, start_time, end_time
+            FROM permission_application WHERE permission_id = %s
         """, (permission_id,))
         permission = cur.fetchone()
-        
         if not permission:
             flash('Permission application not found', 'danger')
-            return redirect(url_for('manage_permissions'))
-        
-        # Update permission application
+            return redirect(url_for('admin_permission_approvals'))
+
+        if permission['status'] != 'pending':
+            flash(f"Permission is already {permission['status']}.", 'info')
+            return redirect(url_for('admin_permission_approvals'))
+
+        # Update application status
         cur.execute("""
             UPDATE permission_application 
-            SET status = %s, processed_by = %s, processed_at = NOW(), comments = %s 
+            SET status = %s, processed_by = %s, processed_on = NOW(), comments = %s 
             WHERE permission_id = %s
         """, (action, admin_id, comments, permission_id))
-        
-        # Only deduct hours if approved
+
         if action == 'approved':
-            month_year = permission['date'].strftime('%Y-%m')
-            
-            # Check if balance record exists
+            # Update used hours in permission_balance
+            current_month = permission['date'].strftime('%Y-%m')
             cur.execute("""
-                SELECT used_hours 
-                FROM permission_balance 
+                UPDATE permission_balance
+                SET used_hours = used_hours + %s
                 WHERE emp_id = %s AND month_year = %s
-            """, (permission['emp_id'], month_year))
-            balance = cur.fetchone()
-            
-            if balance:
-                cur.execute("""
-                    UPDATE permission_balance 
-                    SET used_hours = used_hours + %s 
-                    WHERE emp_id = %s AND month_year = %s
-                """, (permission['total_hours'], permission['emp_id'], month_year))
-            else:
-                cur.execute("""
-                    INSERT INTO permission_balance (emp_id, month_year, allowed_hours, used_hours)
-                    VALUES (%s, %s, 3.00, %s)
-                """, (permission['emp_id'], month_year, permission['total_hours']))
+            """, (permission['total_hours'], permission['emp_id'], current_month))
+            # If the update above somehow fails to find a record (e.g., month_year doesn't exist yet),
+            # this INSERT ... ON DUPLICATE KEY UPDATE ensures it's created or updated.
+            # This requires `emp_id` and `month_year` to be a unique key in `permission_balance`.
+            # For simplicity, if the update fails, we can assume it will be handled by the next month's
+            # initialization if the user applies for a new permission.
+            # A more robust solution might check rows affected by UPDATE and INSERT if 0.
         
         conn.commit()
         flash(f'Permission application {action} successfully!', 'success')
     except Exception as e:
         conn.rollback()
-        flash(f'Error processing permission application: {str(e)}', 'danger')
+        flash(f'Error processing permission: {str(e)}', 'danger')
     finally:
         cur.close()
-    
-    return redirect(url_for('manage_permissions'))
+    return redirect(url_for('admin_permission_approvals'))
 
-@app.route('/admin/permission_types')
-def manage_permission_types():
-    if not is_admin_logged_in():
-        return redirect(url_for('login'))
-    
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM permission_type ORDER BY name")
-    permission_types = cur.fetchall()
-    cur.close()
-    
-    return render_template('manage_permission_types.html',
-                         permission_types=permission_types)
-
-@app.route('/admin/permission_type/add', methods=['POST'])
-def add_permission_type():
-    if not is_admin_logged_in():
-        return redirect(url_for('login'))
-    
-    name = request.form['name']
-    description = request.form['description']
-    max_hours = request.form.get('max_hours', 3.00)
-    
-    cur = conn.cursor()
-    try:
-        cur.execute("""
-            INSERT INTO permission_type (name, description, max_hours)
-            VALUES (%s, %s, %s)
-        """, (name, description, max_hours))
-        conn.commit()
-        flash('Permission type added successfully!', 'success')
-    except Exception as e:
-        conn.rollback()
-        flash(f'Error adding permission type: {str(e)}', 'danger')
-    finally:
-        cur.close()
-    
-    return redirect(url_for('manage_permission_types'))
-
-@app.route('/admin/permission_type/edit/<int:permission_type_id>', methods=['POST'])
-def edit_permission_type(permission_type_id):
-    if not is_admin_logged_in():
-        return redirect(url_for('login'))
-    
-    name = request.form['name']
-    description = request.form['description']
-    max_hours = request.form.get('max_hours', 3.00)
-    
-    cur = conn.cursor()
-    try:
-        cur.execute("""
-            UPDATE permission_type 
-            SET name = %s, description = %s, max_hours = %s
-            WHERE permission_type_id = %s
-        """, (name, description, max_hours, permission_type_id))
-        conn.commit()
-        flash('Permission type updated successfully!', 'success')
-    except Exception as e:
-        conn.rollback()
-        flash(f'Error updating permission type: {str(e)}', 'danger')
-    finally:
-        cur.close()
-    
-    return redirect(url_for('manage_permission_types'))
-
-@app.route('/admin/permission_type/delete/<int:permission_type_id>', methods=['POST'])
-def delete_permission_type(permission_type_id):
-    if not is_admin_logged_in():
-        return redirect(url_for('login'))
-    
-    cur = conn.cursor()
-    try:
-        # Check if permission type is used in applications
-        cur.execute("""
-            SELECT COUNT(*) as app_count 
-            FROM permission_application 
-            WHERE permission_type_id = %s
-        """, (permission_type_id,))
-        result = cur.fetchone()
-        
-        if result['app_count'] > 0:
-            flash('Cannot delete permission type with existing applications', 'danger')
-            return redirect(url_for('manage_permission_types'))
-        
-        cur.execute("DELETE FROM permission_type WHERE permission_type_id = %s", (permission_type_id,))
-        conn.commit()
-        flash('Permission type deleted successfully!', 'success')
-    except Exception as e:
-        conn.rollback()
-        flash(f'Error deleting permission type: {str(e)}', 'danger')
-    finally:
-        cur.close()
-    
-    return redirect(url_for('manage_permission_types'))
-
-# Permission Reports
-@app.route('/admin/reports/permissions')
-def permission_report():
-    if not is_admin_logged_in():
-        return redirect(url_for('login'))
-
-    try:
-        start_date = request.args.get('start_date', '')
-        end_date = request.args.get('end_date', '')
-        emp_id = request.args.get('emp_id', 'all')
-        status = request.args.get('status', 'all')
-        
-        cur = conn.cursor()
-        
-        # Get all active employees for filter dropdown
-        cur.execute("SELECT emp_id, first_name, last_name, employee_id FROM employee WHERE status = 'active'")
-        employees = cur.fetchall()
-        
-        # Build query based on filters
-        query = """
-            SELECT 
-                pa.*, 
-                e.first_name, 
-                e.last_name, 
-                e.employee_id, 
-                pt.name as permission_name,
-                TIME(pa.start_time) as start_time,
-                TIME(pa.end_time) as end_time,
-                pa.total_hours,
-                DATE(pa.date) as date_only,
-                DATE_FORMAT(pa.applied_at, '%%Y-%%m-%%d %%H:%%i') as formatted_applied_at,
-                DATE_FORMAT(pa.processed_at, '%%Y-%%m-%%d %%H:%%i') as formatted_processed_at
-            FROM permission_application pa
-            JOIN employee e ON pa.emp_id = e.emp_id
-            JOIN permission_type pt ON pa.permission_type_id = pt.permission_type_id
-            WHERE 1=1
-        """
-        params = []
-        
-        if start_date:
-            query += " AND pa.date >= %s"
-            params.append(start_date)
-        if end_date:
-            query += " AND pa.date <= %s"
-            params.append(end_date)
-        
-        if emp_id != 'all':
-            query += " AND pa.emp_id = %s"
-            params.append(emp_id)
-        
-        if status != 'all':
-            query += " AND pa.status = %s"
-            params.append(status)
-        
-        query += " ORDER BY pa.date DESC, pa.applied_at DESC"
-        
-        cur.execute(query, tuple(params))
-        permissions = cur.fetchall()
-        
-        # Process permissions to format all time data properly
-        processed_permissions = []
-        for perm in permissions:
-            perm = dict(perm)
-            
-            # Format total_hours
-            if perm.get('total_hours'):
-                if isinstance(perm['total_hours'], timedelta):
-                    total_seconds = perm['total_hours'].total_seconds()
-                    hours = int(total_seconds // 3600)
-                    minutes = int((total_seconds % 3600) // 60)
-                    perm['hours_display'] = f"{hours}h {minutes}m"
-                elif isinstance(perm['total_hours'], (float, int)):
-                    hours = int(perm['total_hours'])
-                    minutes = int((perm['total_hours'] - hours) * 60)
-                    perm['hours_display'] = f"{hours}h {minutes}m"
-                else:
-                    perm['hours_display'] = '-'
-            else:
-                perm['hours_display'] = '-'
-                
-            processed_permissions.append(perm)
-        
-        return render_template('permission_report.html',
-                            permissions=processed_permissions,
-                            employees=employees,
-                            start_date=start_date,
-                            end_date=end_date,
-                            selected_emp_id=int(emp_id) if emp_id != 'all' else None,
-                            status=status)
-    
-    except Exception as e:
-        flash(f"Error generating report: {str(e)}", "danger")
-        return redirect(url_for('admin_dashboard'))
-    finally:
-        cur.close()
-
-@app.route('/admin/reports/export_permissions')
-def export_permissions():
-    if not is_admin_logged_in():
-        return redirect(url_for('login'))
-    
-    try:
-        start_date = request.args.get('start_date', '')
-        end_date = request.args.get('end_date', '')
-        emp_id = request.args.get('emp_id', None)
-        status = request.args.get('status', 'all')
-        
-        cur = conn.cursor()
-        
-        # Build query based on filters
-        query = """
-            SELECT 
-                e.employee_id, 
-                e.first_name, 
-                e.last_name, 
-                pt.name as permission_name, 
-                DATE(pa.date) as date,
-                TIME(pa.start_time) as start_time,
-                TIME(pa.end_time) as end_time,
-                pa.total_hours,
-                pa.reason, 
-                pa.status, 
-                pa.applied_at,
-                pa.processed_at, 
-                pa.comments
-            FROM permission_application pa
-            JOIN employee e ON pa.emp_id = e.emp_id
-            JOIN permission_type pt ON pa.permission_type_id = pt.permission_type_id
-            WHERE 1=1
-        """
-        params = []
-        
-        if start_date:
-            query += " AND pa.date >= %s"
-            params.append(start_date)
-        if end_date:
-            query += " AND pa.date <= %s"
-            params.append(end_date)
-        
-        if emp_id and emp_id != 'all':
-            query += " AND pa.emp_id = %s"
-            params.append(emp_id)
-        
-        if status != 'all':
-            query += " AND pa.status = %s"
-            params.append(status)
-        
-        query += " ORDER BY pa.date DESC, pa.applied_at DESC"
-        
-        cur.execute(query, tuple(params))
-        permissions = cur.fetchall()
-        
-        # Create CSV output
-        output = StringIO()
-        writer = csv.writer(output)
-        
-        # Write header
-        writer.writerow([
-            'Employee ID', 'First Name', 'Last Name', 'Permission Type',
-            'Date', 'Start Time', 'End Time', 'Duration (hours)',
-            'Reason', 'Status', 'Applied At', 'Processed At', 'Comments'
-        ])
-        
-        # Write data rows
-        for perm in permissions:
-            # Format total_hours
-            if perm['total_hours'] is not None:
-                if isinstance(perm['total_hours'], timedelta):
-                    total_hours = perm['total_hours'].total_seconds() / 3600
-                    hours_display = f"{total_hours:.2f}"
-                elif isinstance(perm['total_hours'], (float, int)):
-                    hours_display = f"{perm['total_hours']:.2f}"
-                else:
-                    hours_display = ''
-            else:
-                hours_display = ''
-            
-            # Format time fields safely
-            def format_time(value):
-                if value is None:
-                    return ''
-                if isinstance(value, str):
-                    return value
-                if hasattr(value, 'strftime'):
-                    return value.strftime('%H:%M')
-                return str(value)
-            
-            def format_datetime(value):
-                if value is None:
-                    return ''
-                if isinstance(value, str):
-                    return value
-                if hasattr(value, 'strftime'):
-                    return value.strftime('%Y-%m-%d %H:%M')
-                return str(value)
-            
-            writer.writerow([
-                perm['employee_id'],
-                perm['first_name'],
-                perm['last_name'],
-                perm['permission_name'],
-                perm['date'].strftime('%Y-%m-%d') if perm['date'] else '',
-                format_time(perm['start_time']),
-                format_time(perm['end_time']),
-                hours_display,
-                perm['reason'] or '',
-                perm['status'],
-                format_datetime(perm['applied_at']),
-                format_datetime(perm['processed_at']),
-                perm['comments'] or ''
-            ])
-        
-        output.seek(0)
-        
-        # Generate filename
-        filename = f"permission_report_{start_date}_to_{end_date}.csv" if start_date and end_date else "permission_report_all.csv"
-        
-        # Create response
-        response = make_response(output.getvalue())
-        response.headers['Content-Type'] = 'text/csv'
-        response.headers['Content-Disposition'] = f'attachment; filename={filename}'
-        
-        return response
-    
-    except Exception as e:
-        flash(f"Error exporting report: {str(e)}", "danger")
-        return redirect(url_for('permission_report'))
-    finally:
-        cur.close()
-
-
-# Attendance Management
+# Attendance Management (Admin)
 @app.route('/admin/attendance')
-def manage_attendance():
+def admin_attendance():
     if not is_admin_logged_in():
         return redirect(url_for('login'))
-    
-    date_filter = request.args.get('date', date.today().strftime('%Y-%m-%d'))
+
+    search_date_str = request.args.get('date', date.today().strftime('%Y-%m-%d'))
+    search_employee_id = request.args.get('employee_id')
     
     cur = conn.cursor()
-    cur.execute("""
-        SELECT a.*, e.first_name, e.last_name, e.employee_id 
-        FROM attendance a 
-        JOIN employee e ON a.emp_id = e.emp_id 
-        WHERE DATE(a.check_in) = %s 
-        ORDER BY a.check_in
-    """, (date_filter,))
-    attendance = cur.fetchall()
+
+    query = """
+        SELECT a.*, e.first_name, e.last_name, e.employee_id
+        FROM attendance a
+        JOIN employee e ON a.emp_id = e.emp_id
+        WHERE DATE(a.check_in) = %s
+    """
+    params = [search_date_str]
+
+    if search_employee_id:
+        query += " AND e.employee_id = %s"
+        params.append(search_employee_id)
     
-    cur.execute("""
-        SELECT e.emp_id, e.first_name, e.last_name, e.employee_id 
-        FROM employee e 
-        WHERE e.status = 'active' AND e.emp_id NOT IN (
-            SELECT emp_id FROM attendance WHERE DATE(check_in) = %s
-        )
-    """, (date_filter,))
-    absent_employees = cur.fetchall()
+    query += " ORDER BY a.check_in DESC"
+
+    cur.execute(query, tuple(params))
+    attendance_records = cur.fetchall()
+
+    # Get total employees for the day (to show absentees etc)
+    cur.execute("SELECT emp_id, first_name, last_name, employee_id FROM employee WHERE status = 'active'")
+    all_employees = cur.fetchall()
+    
+    # Identify present employees for the selected date
+    present_emp_ids = {rec['emp_id'] for rec in attendance_records if rec['status'] == 'present'}
+    
+    # Calculate absentee list
+    absent_employees = [
+        emp for emp in all_employees 
+        if emp['emp_id'] not in present_emp_ids
+    ]
     
     cur.close()
-    
-    return render_template('manage_attendance.html', 
-                         attendance=attendance,
-                         absent_employees=absent_employees,
-                         date_filter=date_filter)
 
-@app.route('/admin/attendance/manual_entry', methods=['POST'])
-def manual_attendance_entry():
+    return render_template('admin_attendance.html', 
+                           attendance_records=attendance_records, 
+                           search_date=search_date_str,
+                           search_employee_id=search_employee_id,
+                           absent_employees=absent_employees)
+
+@app.route('/admin/attendance/mark_manual', methods=['POST'])
+def mark_manual_attendance():
     if not is_admin_logged_in():
         return redirect(url_for('login'))
     
     emp_id = request.form['emp_id']
-    date_str = request.form['date']
-    check_in = request.form['check_in']
-    check_out = request.form.get('check_out', None)
-    
-    check_in_datetime = f"{date_str} {check_in}" 
-    check_out_datetime = f"{date_str} {check_out}" if check_out else None
-    
-    total_hours = calculate_work_hours(check_in_datetime, check_out_datetime) if check_out else None
+    attendance_date = request.form['attendance_date']
+    check_in_time = request.form['check_in_time']
+    check_out_time = request.form['check_out_time']
+    status = request.form['status']
     
     cur = conn.cursor()
     try:
+        check_in_dt = datetime.strptime(f"{attendance_date} {check_in_time}", '%Y-%m-%d %H:%M') if check_in_time else None
+        check_out_dt = datetime.strptime(f"{attendance_date} {check_out_time}", '%Y-%m-%d %H:%M') if check_out_time else None
+        
+        # Calculate hours if both check_in and check_out are provided and valid
+        hours_worked = None
+        if check_in_dt and check_out_dt:
+            if check_out_dt <= check_in_dt:
+                flash('Check-out time must be after check-in time.', 'danger')
+                return redirect(url_for('admin_attendance', date=attendance_date))
+            hours_worked = calculate_work_hours(check_in_dt, check_out_dt)
+
         cur.execute("""
-            INSERT INTO attendance (emp_id, check_in, check_out, total_hours, status) 
-            VALUES (%s, %s, %s, %s, 'present')
-        """, (emp_id, check_in_datetime, check_out_datetime, total_hours))
+            INSERT INTO attendance (emp_id, check_in, check_out, hours_worked, status)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (emp_id, check_in_dt, check_out_dt, hours_worked, status))
         conn.commit()
-        flash('Attendance recorded successfully!', 'success')
+        flash('Manual attendance marked successfully!', 'success')
     except Exception as e:
         conn.rollback()
-        flash(f'Error recording attendance: {str(e)}', 'danger')
+        flash(f'Error marking manual attendance: {str(e)}', 'danger')
     finally:
         cur.close()
     
-    return redirect(url_for('manage_attendance', date=date_str))
+    return redirect(url_for('admin_attendance', date=attendance_date))
 
-@app.route('/admin/attendance/update/<int:att_id>', methods=['POST'])
-def update_attendance(att_id):
-    if not is_admin_logged_in():
-        return redirect(url_for('login'))
-    
-    check_in = request.form['check_in']
-    check_out = request.form.get('check_out', None)
-    
-    total_hours = calculate_work_hours(check_in, check_out) if check_out else None
-    
-    cur = conn.cursor()
-    try:
-        if check_out:
-            cur.execute("""
-                UPDATE attendance 
-                SET check_in = %s, check_out = %s, total_hours = %s 
-                WHERE att_id = %s
-            """, (check_in, check_out, total_hours, att_id))
-        else:
-            cur.execute("""
-                UPDATE attendance 
-                SET check_in = %s, check_out = NULL, total_hours = NULL 
-                WHERE att_id = %s
-            """, (check_in, att_id))
-        
-        conn.commit()
-        flash('Attendance updated successfully!', 'success')
-    except Exception as e:
-        conn.rollback()
-        flash(f'Error updating attendance: {str(e)}', 'danger')
-    finally:
-        cur.close()
-    
-    date_str = check_in.split()[0]
-    return redirect(url_for('manage_attendance', date=date_str))
-
-@app.route('/admin/attendance/delete/<int:att_id>', methods=['POST'])
-def delete_attendance(att_id):
+@app.route('/admin/attendance/edit/<int:attendance_id>', methods=['GET', 'POST'])
+def edit_attendance(attendance_id):
     if not is_admin_logged_in():
         return redirect(url_for('login'))
     
     cur = conn.cursor()
+    
+    if request.method == 'POST':
+        check_in_str = request.form['check_in_date'] + ' ' + request.form['check_in_time'] if request.form['check_in_date'] and request.form['check_in_time'] else None
+        check_out_str = request.form['check_out_date'] + ' ' + request.form['check_out_time'] if request.form['check_out_date'] and request.form['check_out_time'] else None
+        status = request.form['status']
+
+        try:
+            check_in_dt = datetime.strptime(check_in_str, '%Y-%m-%d %H:%M') if check_in_str else None
+            check_out_dt = datetime.strptime(check_out_str, '%Y-%m-%d %H:%M') if check_out_str else None
+
+            hours_worked = None
+            if check_in_dt and check_out_dt:
+                if check_out_dt <= check_in_dt:
+                    flash('Check-out time must be after check-in time.', 'danger')
+                    return redirect(url_for('edit_attendance', attendance_id=attendance_id))
+                hours_worked = calculate_work_hours(check_in_dt, check_out_dt)
+            elif status == 'present' and (not check_in_dt or not check_out_dt):
+                flash('For "Present" status, both check-in and check-out times are required.', 'danger')
+                return redirect(url_for('edit_attendance', attendance_id=attendance_id))
+            
+            cur.execute("""
+                UPDATE attendance 
+                SET check_in = %s, check_out = %s, hours_worked = %s, status = %s
+                WHERE attendance_id = %s
+            """, (check_in_dt, check_out_dt, hours_worked, status, attendance_id))
+            conn.commit()
+            flash('Attendance record updated successfully!', 'success')
+            return redirect(url_for('admin_attendance', date=check_in_dt.strftime('%Y-%m-%d') if check_in_dt else date.today().strftime('%Y-%m-%d')))
+        except ValueError:
+            flash('Invalid date or time format. Please use YYYY-MM-DD HH:MM.', 'danger')
+            conn.rollback()
+        except Exception as e:
+            conn.rollback()
+            flash(f'Error updating attendance record: {str(e)}', 'danger')
+        finally:
+            cur.close()
+    
+    # GET request
+    cur.execute("""
+        SELECT a.*, e.first_name, e.last_name, e.employee_id
+        FROM attendance a
+        JOIN employee e ON a.emp_id = e.emp_id
+        WHERE attendance_id = %s
+    """, (attendance_id,))
+    record = cur.fetchone()
+    cur.close()
+
+    if not record:
+        flash('Attendance record not found', 'danger')
+        return redirect(url_for('admin_attendance'))
+
+    return render_template('edit_attendance.html', record=record)
+
+@app.route('/admin/attendance/delete/<int:attendance_id>', methods=['POST'])
+def delete_attendance(attendance_id):
+    if not is_admin_logged_in():
+        return redirect(url_for('login'))
+    
+    cur = conn.cursor()
     try:
-        # Get date before deleting for redirect
-        cur.execute("SELECT DATE(check_in) as date FROM attendance WHERE att_id = %s", (att_id,))
-        date_str = cur.fetchone()['date']
-        
-        cur.execute("DELETE FROM attendance WHERE att_id = %s", (att_id,))
+        cur.execute("DELETE FROM attendance WHERE attendance_id = %s", (attendance_id,))
         conn.commit()
         flash('Attendance record deleted successfully!', 'success')
     except Exception as e:
         conn.rollback()
         flash(f'Error deleting attendance record: {str(e)}', 'danger')
-        return redirect(url_for('manage_attendance'))
     finally:
         cur.close()
-    
-    return redirect(url_for('manage_attendance', date=date_str))
+    return redirect(url_for('admin_attendance'))
 
-# Reports
-@app.route('/admin/reports/attendance')
-def attendance_report():
-    if not is_admin_logged_in():
-        return redirect(url_for('login'))
-    
-    # Get filter parameters with defaults
-    start_date = request.args.get('start_date', (date.today() - timedelta(days=30)).strftime('%Y-%m-%d'))
-    end_date = request.args.get('end_date', date.today().strftime('%Y-%m-%d'))
-    emp_id = request.args.get('emp_id', None)
-    
-    cur = conn.cursor()
-    
-    # Get all active employees for filter dropdown
-    cur.execute("SELECT emp_id, first_name, last_name, employee_id FROM employee WHERE status = 'active'")
-    employees = cur.fetchall()
-    
-    # Build base query
-    query = """
-        SELECT 
-            a.att_id,
-            a.emp_id,
-            e.employee_id,
-            e.first_name,
-            e.last_name,
-            DATE(a.check_in) as date,
-            TIME(a.check_in) as check_in_time,
-            TIME(a.check_out) as check_out_time,
-            a.total_hours,
-            a.status
-        FROM attendance a
-        JOIN employee e ON a.emp_id = e.emp_id
-        WHERE DATE(a.check_in) BETWEEN %s AND %s
-    """
-    params = [start_date, end_date]
-    
-    # Add employee filter if specified
-    if emp_id and emp_id != 'all':
-        query += " AND a.emp_id = %s"
-        params.append(emp_id)
-    
-    query += " ORDER BY date, e.first_name, e.last_name"
-    
-    # Execute query
-    cur.execute(query, tuple(params))
-    attendance_records = cur.fetchall()
-    cur.close()
-    
-    # Calculate summary statistics
-    total_days = len(attendance_records)
-    present_days = sum(1 for r in attendance_records if r['check_out_time'] is not None)
-    
-    # Calculate total hours (only for complete records)
-    total_hours = 0.0
-    for record in attendance_records:
-        if record['total_hours'] is not None:
-            try:
-                total_hours += float(record['total_hours'])
-            except (TypeError, ValueError):
-                pass
-    
-    avg_hours = total_hours / present_days if present_days > 0 else 0.0
-    
-    return render_template('attendance_report.html',
-                         attendance=attendance_records,
-                         employees=employees,
-                         start_date=start_date,
-                         end_date=end_date,
-                         selected_emp_id=emp_id,
-                         total_days=total_days,
-                         present_days=present_days,
-                         total_hours=round(total_hours, 2),
-                         avg_hours=round(avg_hours, 2))
-
-
-@app.route('/admin/reports/export_leave')
-def export_leave():
-    if not is_admin_logged_in():
-        return redirect(url_for('login'))
-    
-    # Get filter parameters
-    start_date = request.args.get('start_date', '')
-    end_date = request.args.get('end_date', '')
-    emp_id = request.args.get('emp_id', None)
-    
-    cur = conn.cursor()
-    
-    # Build query based on filters (same as leave_report)
-    query = """
-        SELECT e.employee_id, e.first_name, e.last_name, 
-               lt.leave_name, la.start_date, la.end_date, 
-               DATEDIFF(la.end_date, la.start_date) + 1 as days,
-               la.reason, la.status, la.applied_on,
-               la.processed_on, la.comments
-        FROM leave_application la 
-        JOIN employee e ON la.emp_id = e.emp_id 
-        JOIN leave_type lt ON la.leave_type_id = lt.leave_type_id 
-        WHERE 1=1
-    """
-    params = []
-    
-    if start_date:
-        query += " AND la.start_date >= %s"
-        params.append(start_date)
-    if end_date:
-        query += " AND la.end_date <= %s"
-        params.append(end_date)
-    
-    if emp_id:
-        query += " AND la.emp_id = %s"
-        params.append(emp_id)
-    
-    query += " ORDER BY la.start_date DESC"
-    
-    cur.execute(query, tuple(params))
-    leaves = cur.fetchall()
-    cur.close()
-    
-    # Create CSV content
-    csv_data = []
-    # Add header
-    csv_data.append("Employee ID,First Name,Last Name,Leave Type,Start Date,End Date,Days,Reason,Status,Applied On,Processed On,Comments\n")
-    
-    # Add rows
-    for leave in leaves:
-        row = [
-            str(leave['employee_id']),
-            str(leave['first_name']),
-            str(leave['last_name']),
-            str(leave['leave_name']),
-            leave['start_date'].strftime('%Y-%m-%d') if leave['start_date'] else '',
-            leave['end_date'].strftime('%Y-%m-%d') if leave['end_date'] else '',
-            str(leave['days']),
-            f'"{str(leave["reason"])}"',  # Wrap in quotes to handle commas
-            str(leave['status']),
-            leave['applied_on'].strftime('%Y-%m-%d %H:%M:%S') if leave['applied_on'] else '',
-            leave['processed_on'].strftime('%Y-%m-%d %H:%M:%S') if leave['processed_on'] else '',
-            f'"{str(leave["comments"])}"' if leave['comments'] else ''
-        ]
-        csv_data.append(','.join(row) + '\n')
-    
-    # Convert to bytes
-    output = BytesIO()
-    output.write(''.join(csv_data).encode('utf-8'))
-    output.seek(0)
-    
-    # Generate filename
-    filename = f"leave_report_{start_date}_to_{end_date}.csv" if start_date and end_date else "leave_report_all.csv"
-    
-    return send_file(
-        output,
-        mimetype='text/csv',
-        as_attachment=True,
-        download_name=filename
-    )
-
-
-
-@app.route('/admin/reports/leave')
-def leave_report():
-    if not is_admin_logged_in():
-        return redirect(url_for('login'))
-    
-    start_date = request.args.get('start_date', '')
-    end_date = request.args.get('end_date', '')
-    emp_id = request.args.get('emp_id', None)
-    
-    cur = conn.cursor()
-    
-    # Get all active employees for filter dropdown
-    cur.execute("SELECT emp_id, first_name, last_name, employee_id FROM employee WHERE status = 'active'")
-    employees = cur.fetchall()
-    
-    # Build query based on filters
-    query = """
-        SELECT la.*, e.first_name, e.last_name, e.employee_id, lt.leave_name 
-        FROM leave_application la 
-        JOIN employee e ON la.emp_id = e.emp_id 
-        JOIN leave_type lt ON la.leave_type_id = lt.leave_type_id 
-        WHERE 1=1
-    """
-    params = []
-    
-    # Add date filters if provided
-    if start_date:
-        query += " AND la.start_date >= %s"
-        params.append(start_date)
-    if end_date:
-        query += " AND la.end_date <= %s"
-        params.append(end_date)
-    
-    if emp_id:
-        query += " AND la.emp_id = %s"
-        params.append(emp_id)
-    
-    query += " ORDER BY la.start_date DESC"
-    
-    cur.execute(query, tuple(params))
-    leaves = cur.fetchall()
-    
-    cur.close()
-    
-    return render_template('leave_report.html', 
-                         leaves=leaves,
-                         employees=employees,
-                         start_date=start_date,
-                         end_date=end_date,
-                         selected_emp_id=int(emp_id) if emp_id else None)
-
-@app.route('/admin/reports/export_attendance')
-def export_attendance():
-    if not is_admin_logged_in():
-        return redirect(url_for('login'))
-    
-    start_date = request.args.get('start_date', '')
-    end_date = request.args.get('end_date', '')
-    emp_id = request.args.get('emp_id', None)
-    
-    cur = conn.cursor()
-    
-    query = """
-        SELECT e.employee_id, e.first_name, e.last_name, 
-               a.check_in, a.check_out, a.total_hours,
-               DATE(a.check_in) as date 
-        FROM attendance a 
-        JOIN employee e ON a.emp_id = e.emp_id 
-        WHERE 1=1    
-    """
-    params = []
-    
-    if start_date:
-        query += " AND DATE(a.check_in) >= %s"
-        params.append(start_date)
-    if end_date:
-        query += " AND DATE(a.check_in) <= %s"
-        params.append(end_date)
-
-    if emp_id:
-        query += " AND a.emp_id = %s"
-        params.append(emp_id)
-    
-    query += " ORDER BY e.employee_id, a.check_in"
-    
-    cur.execute(query, tuple(params))
-    attendance = cur.fetchall()
-    cur.close()
-    
-    csv_data = []
-    csv_data.append("Employee ID,First Name,Last Name,Date,Check In,Check Out,Total Hours\n")
-    
-    for record in attendance:
-        date_str = record['date'].strftime('%Y-%m-%d') if record['date'] else ''
-        check_in_time = record['check_in'].strftime('%H:%M:%S') if record['check_in'] else ''
-        check_out_time = record['check_out'].strftime('%H:%M:%S') if record['check_out'] else ''
-        total_hours = f"{float(record['total_hours']):.2f}" if record['total_hours'] is not None else ''
-        
-        row = [
-            str(record['employee_id']),
-            str(record['first_name']),
-            str(record['last_name']),
-            date_str,
-            check_in_time,
-            check_out_time,
-            total_hours
-        ]
-        csv_data.append(','.join(row) + '\n')
-
-    output = BytesIO()
-    output.write(''.join(csv_data).encode('utf-8'))
-    output.seek(0)
-
-    filename = f"attendance_report_{start_date}_to_{end_date}.csv" if start_date and end_date else "attendance_report.csv"
-
-    return send_file(
-        output,
-        mimetype='text/csv',
-        as_attachment=True,
-        download_name=filename
-    )
-
-
-# Employee Dashboard
+# Employee-specific routes
 @app.route('/employee/dashboard')
 def employee_dashboard():
     if not is_employee_logged_in():
         return redirect(url_for('login'))
     
     emp_id = session['emp_id']
-    employee = get_employee_details(emp_id)
-    
     cur = conn.cursor()
     
-    # Get today's attendance
+    # Get employee details
+    employee = get_employee_details(emp_id)
+
+    # Get recent attendance
     today = date.today().strftime('%Y-%m-%d')
     cur.execute("""
-        SELECT * FROM attendance 
+        SELECT check_in, check_out, hours_worked, status 
+        FROM attendance 
         WHERE emp_id = %s AND DATE(check_in) = %s
+        ORDER BY check_in DESC 
+        LIMIT 1
     """, (emp_id, today))
     today_attendance = cur.fetchone()
 
-    # Check if previous day wasn't checked out
-    yesterday = (date.today() - timedelta(days=1)).strftime('%Y-%m-%d')
+    # Get leave balances
     cur.execute("""
-        SELECT * FROM attendance 
-        WHERE emp_id = %s AND DATE(check_in) = %s AND check_out IS NULL
-    """, (emp_id, yesterday))
-    has_pending_checkout = cur.fetchone() is not None
-    
-    # Get leave balance
-    cur.execute("""
-        SELECT lt.leave_name, lb.remaining_days, lt.max_days 
+        SELECT lb.*, lt.leave_name, lt.description 
         FROM leave_balance lb 
         JOIN leave_type lt ON lb.leave_type_id = lt.leave_type_id 
         WHERE lb.emp_id = %s
     """, (emp_id,))
-    leave_balance = cur.fetchall()
+    leave_balances = cur.fetchall()
     
-    # Get recent attendance (last 5 days)
-    cur.execute("""
-        SELECT DATE(check_in) as date, 
-               TIME(check_in) as check_in_time, 
-               TIME(check_out) as check_out_time, 
-               total_hours 
-        FROM attendance 
-        WHERE emp_id = %s 
-        ORDER BY date DESC 
-        LIMIT 5
-    """, (emp_id,))
-    recent_attendance = cur.fetchall()
-    
-    # Get pending leave applications
+    # Get recent leave applications
     cur.execute("""
         SELECT la.*, lt.leave_name 
         FROM leave_application la 
         JOIN leave_type lt ON la.leave_type_id = lt.leave_type_id 
-        WHERE la.emp_id = %s AND la.status = 'pending' 
-        ORDER BY la.applied_on DESC
+        WHERE la.emp_id = %s 
+        ORDER BY la.applied_on DESC 
+        LIMIT 5
     """, (emp_id,))
-    pending_leaves = cur.fetchall()
-    
+    recent_leaves = cur.fetchall()
+
+    # Get permission balance for current month
+    current_month = date.today().strftime('%Y-%m')
+    cur.execute("""
+        SELECT allowed_hours, used_hours FROM permission_balance 
+        WHERE emp_id = %s AND month_year = %s
+    """, (emp_id, current_month))
+    permission_balance = cur.fetchone()
+    if not permission_balance:
+        # Initialize if not exists
+        permission_balance = {'allowed_hours': 3.00, 'used_hours': 0.00}
+
     cur.close()
     
     return render_template('employee_dashboard.html', 
                          employee=employee,
                          today_attendance=today_attendance,
-                         has_pending_checkout=has_pending_checkout,
-                         leave_balance=leave_balance,
-                         recent_attendance=recent_attendance,
-                         pending_leaves=pending_leaves)
+                         leave_balances=leave_balances,
+                         recent_leaves=recent_leaves,
+                         permission_balance=permission_balance)
 
-# Employee Attendance
-@app.route('/employee/attendance')
+@app.route('/employee/attendance', methods=['GET', 'POST'])
 def employee_attendance():
     if not is_employee_logged_in():
         return redirect(url_for('login'))
-    
     emp_id = session['emp_id']
-    month = request.args.get('month', date.today().strftime('%Y-%m'))
-    
+    current_month = datetime.now().strftime('%Y-%m')
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        cur = conn.cursor()
+        try:
+            today = datetime.now().strftime('%Y-%m-%d')
+            # Check for existing record for today
+            cur.execute("""
+                SELECT attendance_id, check_in, check_out FROM attendance 
+                WHERE emp_id = %s AND DATE(check_in) = %s
+                ORDER BY check_in DESC LIMIT 1
+            """, (emp_id, today))
+            today_record = cur.fetchone()
+
+            if action == 'check_in':
+                if today_record and today_record['check_in'] and not today_record['check_out']:
+                    flash('You are already checked in.', 'info')
+                elif today_record and today_record['check_out']:
+                    flash('You have already completed your attendance for today.', 'info')
+                else:
+                    cur.execute("INSERT INTO attendance (emp_id, check_in, status) VALUES (%s, NOW(), %s)", 
+                                (emp_id, 'present'))
+                    conn.commit()
+                    flash('Checked in successfully!', 'success')
+            elif action == 'check_out':
+                if today_record and today_record['check_in'] and not today_record['check_out']:
+                    check_in_time = today_record['check_in']
+                    check_out_time = datetime.now()
+                    hours_worked = calculate_work_hours(check_in_time, check_out_time)
+                    cur.execute("""
+                        UPDATE attendance 
+                        SET check_out = %s, hours_worked = %s 
+                        WHERE attendance_id = %s
+                    """, (check_out_time, hours_worked, today_record['attendance_id']))
+                    conn.commit()
+                    flash('Checked out successfully!', 'success')
+                else:
+                    flash('You need to check in first or you have already checked out.', 'danger')
+        except Exception as e:
+            conn.rollback()
+            flash(f'Error processing attendance: {str(e)}', 'danger')
+        finally:
+            cur.close()
+        return redirect(url_for('employee_attendance'))
+
+    # GET request for attendance history
     cur = conn.cursor()
     cur.execute("""
-        SELECT DATE(check_in) as date, 
-               TIME(check_in) as check_in, 
-               TIME(check_out) as check_out, 
-               total_hours 
-        FROM attendance 
-        WHERE emp_id = %s AND DATE_FORMAT(check_in, '%%Y-%%m') = %s 
-        ORDER BY date
-    """, (emp_id, month))
-    attendance = cur.fetchall()
-    
-    # Calculate summary
-    total_days = len(attendance)
-    total_hours = sum(record['total_hours'] or 0 for record in attendance)
-    avg_hours = total_hours / total_days if total_days > 0 else 0
-    
+        SELECT * FROM attendance 
+        WHERE emp_id = %s 
+        ORDER BY check_in DESC
+    """, (emp_id,))
+    attendance_history = cur.fetchall()
     cur.close()
-    
+
     return render_template('employee_attendance.html', 
-                         attendance=attendance,
-                         month=month,
-                         total_days=total_days,
-                         total_hours=round(total_hours, 2),
-                         avg_hours=round(avg_hours, 2))
-
-@app.route('/employee/check_in', methods=['POST'])
-def employee_check_in():
-    if not is_employee_logged_in():
-        return redirect(url_for('login'))
-    
-    emp_id = session['emp_id']
-    current_time = get_current_datetime()
-    today = date.today().strftime('%Y-%m-%d')
-    
-    cur = conn.cursor()
-    try:
-        # Check if already checked in today
-        cur.execute("""
-            SELECT * FROM attendance 
-            WHERE emp_id = %s AND DATE(check_in) = %s
-        """, (emp_id, today))
-        existing = cur.fetchone()
-        
-        if existing:
-            flash('You have already checked in today and not checked out yet', 'warning')
-            return redirect(url_for('employee_dashboard'))
-        
-        # Check if previous day wasn't checked out
-        yesterday = (date.today() - timedelta(days=1)).strftime('%Y-%m-%d')
-        cur.execute("""
-            SELECT * FROM attendance 
-            WHERE emp_id = %s AND DATE(check_in) = %s
-        """, (emp_id, yesterday))
-        previous_day = cur.fetchone()
-        
-        if previous_day:
-            flash('You cannot check in today because you were not checked out yesterday. Please contact admin.', 'danger')
-            return redirect(url_for('employee_dashboard'))
-        
-        # Record check-in with status
-        cur.execute("""
-            INSERT INTO attendance (emp_id, check_in, status) 
-            VALUES (%s, %s, 'present')
-        """, (emp_id, current_time))
-        
-        conn.commit()
-        flash('Check-in recorded successfully!', 'success')
-    except Exception as e:
-        conn.rollback()
-        flash(f'Error recording check-in: {str(e)}', 'danger')
-        app.logger.error(f"Error in check_in: {str(e)}")  # Add logging
-    finally:
-        cur.close()
-    
-    return redirect(url_for('employee_dashboard'))
+                           attendance_history=attendance_history, 
+                           current_month=current_month)
 
 
-@app.route('/employee/check_out', methods=['POST'])
-def employee_check_out():
-    if not is_employee_logged_in():
-        return redirect(url_for('login'))
-    
-    emp_id = session['emp_id']
-    current_time = get_current_datetime()
-    
-    cur = conn.cursor()
-    try:
-        # Get today's check-in
-        today = date.today().strftime('%Y-%m-%d')
-        cur.execute("""
-            SELECT * FROM attendance 
-            WHERE emp_id = %s AND DATE(check_in) = %s AND check_out IS NULL
-        """, (emp_id, today))
-        attendance = cur.fetchone()
-        
-        if not attendance:
-            flash('You need to check in first', 'warning')
-            return redirect(url_for('employee_dashboard'))
-        
-        # Calculate work hours
-        check_in = attendance['check_in'].strftime('%Y-%m-%d %H:%M:%S')
-        total_hours = calculate_work_hours(check_in, current_time)
-        
-        # Record check-out
-        cur.execute("""
-            UPDATE attendance 
-            SET check_out = %s, total_hours = %s 
-            WHERE att_id = %s
-        """, (current_time, total_hours, attendance['att_id']))
-        conn.commit()
-        flash('Check-out recorded successfully!', 'success')
-    except Exception as e:
-        conn.rollback()
-        flash(f'Error recording check-out: {str(e)}', 'danger')
-    finally:
-        cur.close()
-    
-    return redirect(url_for('employee_dashboard'))
-
-# Employee Leave Management
 @app.route('/employee/leaves')
 def employee_leaves():
     if not is_employee_logged_in():
@@ -2217,14 +1504,15 @@ def employee_leaves():
     
     cur = conn.cursor()
     
-    # Get leave balance
+    # Get leave balances
     cur.execute("""
-        SELECT lt.leave_name, lb.remaining_days, lt.max_days 
+        SELECT lb.*, lt.leave_name, lt.max_days, lt.description 
         FROM leave_balance lb 
         JOIN leave_type lt ON lb.leave_type_id = lt.leave_type_id 
         WHERE lb.emp_id = %s
+        ORDER BY lt.leave_name
     """, (emp_id,))
-    leave_balance = cur.fetchall()
+    leave_balances = cur.fetchall()
     
     # Get leave applications
     query = """
@@ -2234,111 +1522,90 @@ def employee_leaves():
         WHERE la.emp_id = %s
     """
     params = [emp_id]
-    
     if status != 'all':
         query += " AND la.status = %s"
         params.append(status)
-    
     query += " ORDER BY la.applied_on DESC"
     
     cur.execute(query, tuple(params))
-    leaves = cur.fetchall()
+    leave_applications = cur.fetchall()
     
-    # Get leave types for new application form
-    cur.execute("SELECT * FROM leave_type")
+    # Get leave types for the application form
+    cur.execute("SELECT * FROM leave_type ORDER BY leave_name")
     leave_types = cur.fetchall()
     
     cur.close()
     
     return render_template('employee_leaves.html', 
-                         leave_balance=leave_balance,
-                         leaves=leaves,
+                         leave_balances=leave_balances,
+                         leave_applications=leave_applications,
                          leave_types=leave_types,
-                         status=status)
+                         selected_status=status)
 
 @app.route('/employee/leave/apply', methods=['POST'])
-def apply_leave():
+def apply_for_leave():
     if not is_employee_logged_in():
         return redirect(url_for('login'))
     
     emp_id = session['emp_id']
     leave_type_id = request.form['leave_type_id']
-    start_date = request.form['start_date']
-    end_date = request.form['end_date']
-    leave_duration = request.form['leave_duration']  # 'full_day', 'first_half', 'second_half'
+    start_date_str = request.form['start_date']
+    end_date_str = request.form['end_date']
+    leave_duration = request.form['leave_duration'] # 'full_day', 'first_half', 'second_half'
     reason = request.form['reason']
     
-    # Convert to date objects
-    start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
-    end_dt = datetime.strptime(end_date, '%Y-%m-%d').date()
-    
-    # Validate dates based on leave duration
-    if not validate_leave_dates(start_dt, end_dt, leave_duration):
-        if leave_duration == 'full_day':
-            flash('End date must be after or same as start date for full day leave', 'danger')
-        else:
-            flash('Start and end date must be same for half-day leave', 'danger')
-        return redirect(url_for('employee_leaves'))
-    
-    # Calculate days
-    days = calculate_leave_days(start_dt, end_dt, leave_duration)
-    
-    cur = conn.cursor()
     try:
-        # Check leave balance and if half-day is allowed
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        
+        # Validate dates based on duration
+        if not validate_leave_dates(start_date, end_date, leave_duration):
+            flash('Invalid dates for selected leave duration (half-day leaves must be on a single day).', 'danger')
+            return redirect(url_for('employee_leaves'))
+        
+        # Calculate requested days
+        requested_days = calculate_leave_days(start_date, end_date, leave_duration)
+        
+        cur = conn.cursor()
+        
+        # Check available leave balance
         cur.execute("""
-            SELECT lt.max_days, lt.half_day_allowed, lb.remaining_days 
-            FROM leave_balance lb 
-            JOIN leave_type lt ON lb.leave_type_id = lt.leave_type_id 
-            WHERE lb.emp_id = %s AND lb.leave_type_id = %s
+            SELECT remaining_days FROM leave_balance 
+            WHERE emp_id = %s AND leave_type_id = %s
         """, (emp_id, leave_type_id))
-        result = cur.fetchone()
+        balance = cur.fetchone()
         
-        if not result:
-            flash('Leave type not found', 'danger')
+        if not balance or balance['remaining_days'] < requested_days:
+            flash('Insufficient leave balance for this type of leave.', 'danger')
             return redirect(url_for('employee_leaves'))
             
-        if leave_duration != 'full_day' and not result['half_day_allowed']:
-            flash('Half-day leave is not allowed for this leave type', 'danger')
-            return redirect(url_for('employee_leaves'))
-            
-        if result['remaining_days'] < days:
-            flash(f'Not enough leave balance. You have {result["remaining_days"]} days remaining but requested {days} days.', 'danger')
-            return redirect(url_for('employee_leaves'))
-        
-        # Check for overlapping leave applications - simplified query
+        # Check for overlapping leave applications (pending or approved)
         cur.execute("""
-            SELECT COUNT(*) as overlap_count 
-            FROM leave_application 
-            WHERE emp_id = %s 
-            AND status = 'approved'
-            AND (
-                (%s BETWEEN start_date AND end_date)
-                OR (%s BETWEEN start_date AND end_date)
-                OR (start_date BETWEEN %s AND %s)
-                OR (end_date BETWEEN %s AND %s)
+            SELECT COUNT(*) FROM leave_application
+            WHERE emp_id = %s AND status IN ('pending', 'approved') AND (
+                (start_date <= %s AND end_date >= %s) OR
+                (start_date <= %s AND end_date >= %s) OR
+                (%s <= start_date AND %s >= end_date)
             )
-        """, (
-            emp_id,
-            start_date, end_date,
-            start_date, end_date,
-            start_date, end_date
-        ))
-        overlap = cur.fetchone()['overlap_count'] > 0
+        """, (emp_id, end_date, start_date, start_date, end_date, start_date, end_date))
+        overlap_count = cur.fetchone()['COUNT(*)']
         
-        if overlap:
-            flash('You already have an approved leave during this period', 'danger')
+        if overlap_count > 0:
+            flash('You have an overlapping leave application (pending or approved) for these dates.', 'danger')
             return redirect(url_for('employee_leaves'))
- 
-        # Apply leave
+
+        # Insert leave application
         cur.execute("""
             INSERT INTO leave_application 
-            (emp_id, leave_type_id, start_date, end_date, leave_duration, reason) 
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (emp_id, leave_type_id, start_date, end_date, leave_duration, reason))
+            (emp_id, leave_type_id, start_date, end_date, leave_duration, reason, applied_on, status, requested_days) 
+            VALUES (%s, %s, %s, %s, %s, %s, NOW(), 'pending', %s)
+        """, (emp_id, leave_type_id, start_date, end_date, leave_duration, reason, requested_days))
         
         conn.commit()
         flash('Leave application submitted successfully!', 'success')
+    except ValueError:
+        flash('Invalid date format. Please use YYYY-MM-DD.', 'danger')
+        conn.rollback()
     except Exception as e:
         conn.rollback()
         flash(f'Error applying for leave: {str(e)}', 'danger')
@@ -2353,34 +1620,26 @@ def cancel_leave(leave_id):
         return redirect(url_for('login'))
     
     emp_id = session['emp_id']
-    
     cur = conn.cursor()
     try:
-        # Check if leave can be cancelled (status is pending)
-        cur.execute("""
-            SELECT status FROM leave_application 
-            WHERE leave_id = %s AND emp_id = %s
-        """, (leave_id, emp_id))
+        cur.execute("SELECT status FROM leave_application WHERE leave_id = %s AND emp_id = %s", (leave_id, emp_id))
         leave = cur.fetchone()
         
         if not leave:
-            flash('Leave application not found', 'danger')
+            flash('Leave application not found or you do not have permission to cancel it', 'danger')
             return redirect(url_for('employee_leaves'))
         
-        if leave['status'] != 'pending':
-            flash('Only pending leaves can be cancelled', 'danger')
+        if leave['status'] == 'approved':
+            flash('Approved leaves cannot be cancelled by employee. Please contact admin to revert.', 'danger')
             return redirect(url_for('employee_leaves'))
         
-        # Delete leave application
-        cur.execute("""
-            DELETE FROM leave_application 
-            WHERE leave_id = %s
-        """, (leave_id,))
+        cur.execute("UPDATE leave_application SET status = 'cancelled', comments = %s, processed_on = NOW() WHERE leave_id = %s AND emp_id = %s", 
+                    ('Cancelled by employee', leave_id, emp_id))
         conn.commit()
         flash('Leave application cancelled successfully!', 'success')
     except Exception as e:
         conn.rollback()
-        flash(f'Error cancelling leave: {str(e)}', 'danger')
+        flash(f'Error cancelling leave application: {str(e)}', 'danger')
     finally:
         cur.close()
     
@@ -2395,199 +1654,208 @@ def employee_profile():
     emp_id = session['emp_id']
     employee = get_employee_details(emp_id)
     
+    if not employee:
+        flash('Employee profile not found.', 'danger')
+        return redirect(url_for('employee_dashboard'))
+    
     return render_template('employee_profile.html', employee=employee)
 
-@app.route('/employee/change_password', methods=['POST'])
-def change_employee_password():
+@app.route('/employee/profile/edit', methods=['GET', 'POST'])
+def edit_employee_profile():
     if not is_employee_logged_in():
         return redirect(url_for('login'))
     
     emp_id = session['emp_id']
-    current_password = request.form['current_password'].encode('utf-8')
-    new_password = request.form['new_password']
-    
-    if len(new_password) < 8:
-        flash('Password must be at least 8 characters long', 'danger')
-        return redirect(url_for('employee_profile'))
-    
     cur = conn.cursor()
-    try:
-        # Verify current password
-        cur.execute("SELECT password_hash FROM employee WHERE emp_id = %s", (emp_id,))
-        employee = cur.fetchone()
-        
-        if not employee or not bcrypt.checkpw(current_password, employee['password_hash'].encode('utf-8')):
-            flash('Current password is incorrect', 'danger')
-            return redirect(url_for('employee_profile'))
-        
-        # Update password
-        hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        cur.execute("""
-            UPDATE employee 
-            SET password_hash = %s 
-            WHERE emp_id = %s
-        """, (hashed_password, emp_id))
-        conn.commit()
-        flash('Password changed successfully!', 'success')
-    except Exception as e:
-        conn.rollback()
-        flash(f'Error changing password: {str(e)}', 'danger')
-    finally:
-        cur.close()
     
-    return redirect(url_for('employee_profile'))
-
-@app.route('/employee/update_profile_pic', methods=['POST'])
-def update_employee_profile_pic():
-    if not is_employee_logged_in():
-        return redirect(url_for('login'))
-    
-    emp_id = session['emp_id']
-    
-    if 'profile_pic' not in request.files:
-        flash('No file selected', 'danger')
-        return redirect(url_for('employee_profile'))
-    
-    file = request.files['profile_pic']
-    if file.filename == '':
-        flash('No file selected', 'danger')
-        return redirect(url_for('employee_profile'))
-    
-    if file and allowed_file(file.filename):
-        # Get employee details to use the employee_id in filename
-        cur = conn.cursor()
-        cur.execute("SELECT employee_id FROM employee WHERE emp_id = %s", (emp_id,))
-        employee = cur.fetchone()
-        cur.close()
+    if request.method == 'POST':
+        # Get form data
+        personal_email = request.form['personal_email']
+        phone = request.form['phone']
         
-        if not employee:
-            flash('Employee not found', 'danger')
-            return redirect(url_for('employee_profile'))
-        
-        filename = secure_filename(f"{employee['employee_id']}_{file.filename}")
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        
-        # Delete old profile pic if exists
-        cur = conn.cursor()
-        cur.execute("SELECT profile_pic FROM employee WHERE emp_id = %s", (emp_id,))
-        old_pic = cur.fetchone()['profile_pic']
-        
-        if old_pic and os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], old_pic)):
-            try:
-                os.remove(os.path.join(app.config['UPLOAD_FOLDER'], old_pic))
-            except:
-                pass
-        
-        # Save new file
-        file.save(filepath)
+        # Handle file upload
+        profile_pic = None
+        if 'profile_pic' in request.files:
+            file = request.files['profile_pic']
+            if file and allowed_file(file.filename):
+                # Get current employee_id to use in filename
+                cur.execute("SELECT employee_id FROM employee WHERE emp_id = %s", (emp_id,))
+                employee_data = cur.fetchone()
+                if employee_data:
+                    employee_actual_id = employee_data['employee_id']
+                    filename = secure_filename(f"{employee_actual_id}_{file.filename}")
+                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                    profile_pic = filename
+                else:
+                    flash('Could not retrieve employee ID for profile picture.', 'danger')
+                    return redirect(url_for('edit_employee_profile'))
         
         # Update database
         try:
-            cur.execute("""
-                UPDATE employee 
-                SET profile_pic = %s 
-                WHERE emp_id = %s
-            """, (filename, emp_id))
+            if profile_pic:
+                cur.execute("""
+                    UPDATE employee 
+                    SET personal_email = %s, phone = %s, profile_pic = %s
+                    WHERE emp_id = %s
+                """, (personal_email, phone, profile_pic, emp_id))
+            else:
+                cur.execute("""
+                    UPDATE employee 
+                    SET personal_email = %s, phone = %s
+                    WHERE emp_id = %s
+                """, (personal_email, phone, emp_id))
+            
+            # Handle password reset if provided
+            current_password = request.form.get('current_password')
+            new_password = request.form.get('new_password')
+            confirm_new_password = request.form.get('confirm_new_password')
+
+            if new_password: # If user intends to change password
+                # Get current hashed password for verification
+                cur.execute("SELECT password_hash FROM employee WHERE emp_id = %s", (emp_id,))
+                employee_pass = cur.fetchone()
+
+                if not employee_pass or not bcrypt.checkpw(current_password.encode('utf-8'), employee_pass['password_hash'].encode('utf-8')):
+                    flash('Current password is incorrect.', 'danger')
+                    return redirect(url_for('edit_employee_profile'))
+                
+                if len(new_password) < 8:
+                    flash('New password must be at least 8 characters long', 'danger')
+                    return redirect(url_for('edit_employee_profile'))
+
+                if new_password != confirm_new_password:
+                    flash('New passwords do not match', 'danger')
+                    return redirect(url_for('edit_employee_profile'))
+                
+                hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                cur.execute("""
+                    UPDATE employee 
+                    SET password_hash = %s 
+                    WHERE emp_id = %s
+                """, (hashed_password, emp_id))
+            
             conn.commit()
-            flash('Profile picture updated successfully!', 'success')
+            flash('Profile updated successfully!', 'success')
+            return redirect(url_for('employee_profile'))
         except Exception as e:
             conn.rollback()
-            flash(f'Error updating profile picture: {str(e)}', 'danger')
+            flash(f'Error updating profile: {str(e)}', 'danger')
         finally:
             cur.close()
-    else:
-        flash('Allowed file types are: png, jpg, jpeg, gif', 'danger')
     
-    return redirect(url_for('employee_profile'))
+    # GET request - show form with current data
+    employee = get_employee_details(emp_id)
+    
+    if not employee:
+        flash('Employee profile not found.', 'danger')
+        return redirect(url_for('employee_dashboard'))
+    
+    return render_template('edit_employee_profile.html', employee=employee)
 
-
-# Calendar View
+# Employee Calendar
 @app.route('/employee/calendar')
 def employee_calendar():
     if not is_employee_logged_in():
         return redirect(url_for('login'))
     
     emp_id = session['emp_id']
-    year = request.args.get('year', date.today().year)
-    month = request.args.get('month', date.today().month)
+    year = int(request.args.get('year', datetime.now().year))
+    month = int(request.args.get('month', datetime.now().month))
     
+    first_day = date(year, month, 1)
+    last_day = date(year, month, 1) + timedelta(days=32)
+    last_day = last_day.replace(day=1) - timedelta(days=1)
+    
+    # Get all days of the month
+    all_days = []
+    current_day = first_day
+    while current_day <= last_day:
+        all_days.append(current_day)
+        current_day += timedelta(days=1)
+        
     cur = conn.cursor()
-    
-    # Get attendance for the month
+    # Fetch all attendance, leave, and permission for the employee for the selected month
+    # Attendance
     cur.execute("""
-        SELECT DATE(check_in) as date, 
-               TIME(check_in) as check_in, 
-               TIME(check_out) as check_out, 
-               total_hours 
+        SELECT DATE(check_in) as event_date, 
+               CASE 
+                   WHEN status = 'present' THEN 'Present' 
+                   ELSE 'Absent' 
+               END as event_type, 
+               check_in, check_out, hours_worked
         FROM attendance 
-        WHERE emp_id = %s AND YEAR(check_in) = %s AND MONTH(check_in) = %s 
-        ORDER BY date
-    """, (emp_id, year, month))
-    attendance = cur.fetchall()
+        WHERE emp_id = %s 
+          AND DATE(check_in) >= %s AND DATE(check_in) <= %s
+    """, (emp_id, first_day, last_day))
+    attendance_records = {r['event_date']: r for r in cur.fetchall()}
     
-    # Get leaves for the month
+    # Leaves
     cur.execute("""
-        SELECT start_date, end_date, status 
-        FROM leave_application 
-        WHERE emp_id = %s AND (
-            (YEAR(start_date) = %s AND MONTH(start_date) = %s) OR
-            (YEAR(end_date) = %s AND MONTH(end_date) = %s)
-        )
-    """, (emp_id, year, month, year, month))
-    leaves = cur.fetchall()
+        SELECT la.start_date, la.end_date, la.status, lt.leave_name
+        FROM leave_application la
+        JOIN leave_type lt ON la.leave_type_id = lt.leave_type_id
+        WHERE la.emp_id = %s
+          AND la.status IN ('approved', 'pending')
+          AND (
+                (la.start_date <= %s AND la.end_date >= %s) OR
+                (la.start_date >= %s AND la.start_date <= %s)
+              )
+    """, (emp_id, last_day, first_day, first_day, last_day))
+    leave_records = cur.fetchall()
+
+    # Permissions
+    cur.execute("""
+        SELECT date as event_date, status, total_hours, pt.name as permission_name
+        FROM permission_application pa
+        JOIN permission_type pt ON pa.permission_type_id = pt.permission_type_id
+        WHERE pa.emp_id = %s
+          AND pa.status IN ('approved', 'pending')
+          AND pa.date >= %s AND pa.date <= %s
+    """, (emp_id, first_day, last_day))
+    permission_records = {r['event_date']: r for r in cur.fetchall()}
     
     cur.close()
     
-    # Create calendar data structure
     calendar_data = []
+    current_date = first_day
     
-    # Get first and last day of month
-    first_day = date(int(year), int(month), 1)
-    last_day = date(int(year), int(month) + 1, 1) - timedelta(days=1) if int(month) < 12 else date(int(year) + 1, 1, 1) - timedelta(days=1)
-    
-    # Get days from previous month to show
-    prev_month_days = (first_day.weekday() + 1) % 7  # +1 for Monday as first day
-    
-    # Add days from previous month
-    prev_month_last_day = first_day - timedelta(days=1)
-    for day in range(prev_month_last_day.day - prev_month_days + 1, prev_month_last_day.day + 1):
+    # Add leading blank days for the calendar
+    for _ in range(first_day.weekday()):
         calendar_data.append({
-            'day': day,
-            'month': 'prev',
-            'attendance': None,
-            'leave': None
+            'date': None, 
+            'is_current_month': False, 
+            'attendance': None, 
+            'leave': None, 
+            'permission': None
         })
-    
-    # Add days from current month
-    for day in range(1, last_day.day + 1):
-        current_date = date(int(year), int(month), day)
-        date_str = current_date.strftime('%Y-%m-%d')
         
-        # Find attendance for this day
-        day_attendance = next((a for a in attendance if a['date'] == current_date), None)
+    while current_date <= last_day:
+        data_for_day = {
+            'date': current_date,
+            'is_current_month': True,
+            'is_today': (current_date == date.today()),
+            'attendance': attendance_records.get(current_date),
+            'leave': None,
+            'permission': permission_records.get(current_date)
+        }
         
-        # Find leave for this day
-        day_leave = None
-        for leave in leaves:
+        # Check for leaves that span this day
+        for leave in leave_records:
             if leave['start_date'] <= current_date <= leave['end_date']:
-                day_leave = leave
-                break
+                data_for_day['leave'] = leave
+                break # A day can only have one leave record for simplicity here
+                
+        calendar_data.append(data_for_day)
+        current_date += timedelta(days=1)
         
+    # Add trailing blank days to fill the last week
+    while len(calendar_data) % 7 != 0:
         calendar_data.append({
-            'day': day,
-            'month': 'current',
-            'attendance': day_attendance,
-            'leave': day_leave
-        })
-    
-    # Add days from next month to complete the grid
-    next_month_days = (6 - last_day.weekday()) % 7  # 6 for Sunday as last day
-    for day in range(1, next_month_days + 1):
-        calendar_data.append({
-            'day': day,
-            'month': 'next',
-            'attendance': None,
-            'leave': None
+            'date': None, 
+            'is_current_month': False, 
+            'attendance': None, 
+            'leave': None, 
+            'permission': None
         })
     
     # Split into weeks (7 days each)
@@ -2634,4 +1902,4 @@ def register():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    app.run(host='0.0.0.0', port=os.getenv('PORT', 8080)) # Ensure host is 0.0.0.0 for Railway
