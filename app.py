@@ -14,19 +14,20 @@ from flask import make_response
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "your_fallback_secret_key")
 
+print("DEBUG: MYSQLHOST =", repr(os.getenv('MYSQLHOST')))
+
 try:
     conn = pymysql.connect(
-        print("DEBUG: MYSQLHOST =", repr(os.getenv('MYSQLHOST')))
         host=os.getenv('MYSQLHOST'),
         user=os.getenv('MYSQLUSER'),
         password=os.getenv('MYSQLPASSWORD'),
         database=os.getenv('MYSQLDATABASE'),
-        port=int(os.getenv('MYSQLPORT', 3306)),
+        port=int(os.getenv('MYSQLPORT')),
         cursorclass=pymysql.cursors.DictCursor
     )
-    print("✅ DB connection successful")
+    print("✅ Database connection successful")
 except Exception as e:
-    print("❌ DB connection failed:", e)
+    print("❌ Database connection failed:", e)
     raise
 
 cursor = conn.cursor()
