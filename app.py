@@ -13,8 +13,10 @@ from flask import make_response
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "your_fallback_secret_key")
+
 try:
     conn = pymysql.connect(
+        print("DEBUG: MYSQLHOST =", repr(os.getenv('MYSQLHOST')))
         host=os.getenv('MYSQLHOST'),
         user=os.getenv('MYSQLUSER'),
         password=os.getenv('MYSQLPASSWORD'),
