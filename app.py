@@ -15,11 +15,11 @@ app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "your_fallback_secret_key")
 
 conn = pymysql.connect(
-    host=os.getenv('MYSQLHOST'),
-    user=os.getenv('MYSQLUSER'),
-    password=os.getenv('MYSQLPASSWORD'),
-    database=os.getenv('MYSQLDATABASE'),
-    port=int(os.getenv('MYSQLPORT', 3306)),
+    host=os.getenv('MYSQL_HOST'),          # Changed from MYSQLHOST
+    user=os.getenv('MYSQL_USERNAME'),      # Changed from MYSQLUSER
+    password=os.getenv('MYSQL_PASSWORD'),  # Changed from MYSQLPASSWORD
+    database=os.getenv('MYSQL_DATABASE'),  # Changed from MYSQLDATABASE
+    port=int(os.getenv('MYSQL_PORT', 3306)), # Changed from MYSQLPORT
     cursorclass=pymysql.cursors.DictCursor
 )
 cursor = conn.cursor()
