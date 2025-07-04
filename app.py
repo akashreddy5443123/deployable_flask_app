@@ -32,13 +32,15 @@ except Exception as e:
 '''
 mysql_public_url = os.getenv('MYSQL_PUBLIC_URL')
 if mysql_public_url:
+    from urllib.parse import urlparse
     parsed = urlparse(mysql_public_url)
+    
     conn = pymysql.connect(
         host=parsed.hostname,
         port=parsed.port or 3306,
         user=parsed.username,
         password=parsed.password,
-        database=parsed.path[1:]
+        database=parsed.path[1:]  
     )
 cursor = conn.cursor()
 
