@@ -15,10 +15,8 @@ app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "your_fallback_secret_key")
 
 print("DEBUG: MYSQLHOST =", repr(os.getenv('MYSQLHOST')))
-DATABASE_URL = os.getenv('MYSQL_PUBLIC_URL')
-print(DATABASE_URL)
 
-try:
+'''try:
     conn = pymysql.connect(
         host=os.getenv('MYSQLHOST'),
         user=os.getenv('MYSQLUSER'),
@@ -31,7 +29,17 @@ try:
 except Exception as e:
     print("❌ Database connection failed:", e)
     raise
-
+'''
+mysql_public_url = os.getenv('MYSQL_PUBLIC_URL')
+if mysql_public_url:
+    parsed = urlparse(mysql_public_url)
+    conn = pymysql.connect(
+        host=parsed.hostname,
+        port=parsed.port or 3306,
+        user=parsed.username,
+        password=parsed.password,
+        database=parsed.path[1:]
+    )
 cursor = conn.cursor()
 
 # File upload configuration
