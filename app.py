@@ -31,6 +31,7 @@ except Exception as e:
     raise
 '''
 mysql_public_url = os.getenv('MYSQL_PUBLIC_URL')
+print(mysql_public_url)
 if mysql_public_url:
     from urllib.parse import urlparse
     parsed = urlparse(mysql_public_url)
