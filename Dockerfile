@@ -1,5 +1,6 @@
 # Assuming you have a FROM line at the top, e.g.:
-FROM python:3.9-slim-buster # Or whatever Python version you prefer and have tested locally
+FROM python:3.9-slim-buster 
+# Or whatever Python version you prefer and have tested locally
 
 WORKDIR /app
 
